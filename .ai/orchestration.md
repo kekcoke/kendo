@@ -9,8 +9,10 @@
 
 | Variable | Type | Resolved By | Description |
 |---|---|---|---|
-| `{{DAY_NUMBER}}` | integer | Phase 0 / `current_state` | Current curriculum day (1-indexed) |
-| `{{SLUG}}` | string | Phase 1 (Architect) | kebab-case deliverable summary (e.g. `infra-foundation`) |
+| `{{DAY_NUMBER}}` | integer | Phase 0 / `current_state` | Current session day (1-indexed, used for file naming + branch naming) |
+| `{{MILESTONE}}` | string | Phase 0 (scope derivation) | Next unbuilt milestone ID from roadmap (e.g. `M1.1`, `M1.2`) |
+| `{{MILESTONE_TITLE}}` | string | Phase 0 (scope derivation) | Human-readable milestone description |
+| `{{SLUG}}` | string | Phase 1 (Architect) | kebab-case deliverable summary (e.g. `solution-scaffold`) |
 | `{{TASK_LIST}}` | ordered list | Phase 1 spec `## Implementation Plan` | Ordered commit units for Developer+QA |
 | `{{TEST_COMMAND}}` | string | DevOps config | Full test suite command (e.g. `dotnet test /p:CollectCoverage=true`) |
 | `{{LINT_COMMAND}}` | string | DevOps config | Linter command (e.g. `dotnet format --verify-no-changes`) |
@@ -21,7 +23,20 @@
 
 ---
 
-## 2. Prerequisites
+## 2. Source of Truth
+
+> There are no external curriculum article files. All scope is derived from two live documents:
+
+| Document | Role |
+|---|---|
+| `docs/platform_roadmap.md §Phase {{phase_plan}}` | Defines milestones, acceptance criteria, and the component status table (✅/~/❌) |
+| `.ai/current_state.md` | Tracks per-day phase outputs, carry-forward items, incomplete tasks, and dependency map |
+
+**Scope derivation rule (Phase 0):** The Orchestrator reads the `### Architectural Components` table for `§Phase {{phase_plan}}` and identifies the first row with status `~` (not yet started). That component's parent milestone becomes `{{MILESTONE}}` for the session. Multiple adjacent `~` milestones may be grouped into one session only if the Architect explicitly scopes them and the combined work is achievable in a single day.
+
+---
+
+## 3. Prerequisites
 
 Verify before every session. Failure blocks Phase 4b only — all prior phases can still run.
 
@@ -32,22 +47,25 @@ If either check fails: surface the issue and document it in `current_state.md §
 
 ---
 
-## 3. Phase Definitions
+## 4. Phase Definitions
 
-### Phase 0 — State Initialization
+### Phase 0 — State Initialization & Scope Derivation
 **Agent:** Orchestrator (no delegation)  
-**Trigger:** Start of every new day session  
+**Trigger:** Start of every new session  
 **Inputs:** `.ai/current_state.md`, `docs/platform_roadmap.md §{{phase_plan}}`
 
 **Actions (in order):**
 1. Read `current_state.md` in full. Load: `## Completed Days`, `## Active Dependency Map`, `## Carry-Forward Items`.
 2. Check `incomplete_tasks` — if non-empty → **halt**. Surface each blocker. Do not advance to Phase 1.
-3. Confirm the current day's task does not conflict with any dependency in `## Active Dependency Map`.
-4. Resolve `{{DAY_NUMBER}}`, `{{BRANCH_BASE}}`, and `{{phase_plan}}` for this session.
-5. Update `current_state.md`: set `current_phase: 0`.
+3. Read `docs/platform_roadmap.md §Phase {{phase_plan}}` component status table. Find the first `~` row. Resolve `{{MILESTONE}}` and `{{MILESTONE_TITLE}}`.
+4. If all components in the phase are ✅ → surface "Phase {{phase_plan}} complete" and prompt user to advance `phase_plan` before proceeding.
+5. Confirm the resolved milestone does not conflict with any dependency in `## Active Dependency Map`.
+6. Resolve `{{DAY_NUMBER}}`, `{{BRANCH_BASE}}`, and `{{phase_plan}}` for this session.
+7. Update `current_state.md`: set `current_phase: 0`.
 
 **Gate to Phase 0b / Phase 1 — all must be true:**
 - [ ] `incomplete_tasks` is empty
+- [ ] `{{MILESTONE}}` resolved from roadmap component table
 - [ ] No dependency conflicts detected
 - [ ] `{{DAY_NUMBER}}`, `{{BRANCH_BASE}}`, `{{phase_plan}}` resolved
 
@@ -73,22 +91,26 @@ git push origin main develop
 ### Phase 1 — Architecture & Contract Design
 **Agent:** `docs/agents/agent_platform_architect.md`  
 **Skills:** `skill_requirements_parser`, `skill_system_design`  
-**Inputs:** Today's curriculum article, `docs/platform_roadmap.md §{{phase_plan}}`, `current_state.md`  
+**Inputs:**
+- `docs/platform_roadmap.md §Phase {{phase_plan}}` — milestone `{{MILESTONE}}` definition, acceptance criteria, component requirements
+- `.ai/current_state.md` — carry-forward items, dependency map, completed days context
 **Output:** `docs/architecture/day_{{DAY_NUMBER}}_spec.md`  
 **Sets:** `{{PARSER_OUTPUT}}`, `{{TASK_LIST}}`, `{{SLUG}}`
 
 **Required spec sections:**
+- `## Milestone Scope` — which roadmap milestone(s) this day covers; what is explicitly out of scope
 - `## Layer Changes` — which services/components are touched
 - `## Data Contracts` — API schemas, message schemas, DB migrations
 - `## Implementation Plan (Commit Units)` — ordered list; each unit has: files, gate command, commit message
-- `## Success Checklist` — explicit pass/fail criteria
-- `## Resilience Mandate` — circuit breaker config, fallback, async boundaries (where applicable)
+- `## Success Checklist` — explicit pass/fail criteria (must map 1:1 to the roadmap acceptance criteria for `{{MILESTONE}}`)
+- `## Resilience Mandate` — circuit breaker config, fallback, async boundaries (or "N/A — not applicable this milestone" explicitly stated)
 
 **Gate to Phase 2 — all must be true:**
 - [ ] `docs/architecture/day_{{DAY_NUMBER}}_spec.md` exists
-- [ ] File contains `## Success Checklist` with ≥ 1 item
-- [ ] File contains `## Implementation Plan (Commit Units)` with ≥ 1 unit
-- [ ] All circuit breaker / fallback mechanisms declared (or N/A explicitly stated)
+- [ ] `## Milestone Scope` names `{{MILESTONE}}` explicitly
+- [ ] `## Success Checklist` maps to roadmap acceptance criteria for `{{MILESTONE}}`
+- [ ] `## Implementation Plan (Commit Units)` has ≥ 1 unit
+- [ ] Resilience Mandate declared (or N/A stated)
 - [ ] Data contracts and API schemas defined
 
 ---
@@ -116,7 +138,7 @@ git checkout -b "$BRANCH"
    git add -A
    git commit -m "<type>(<scope>): <message from spec>
    
-   Day {{DAY_NUMBER}} — unit N of M
+   Day {{DAY_NUMBER}} — unit N of M | Milestone {{MILESTONE}}
    Coverage: <reported %>
    Lint: clean"
    ```
@@ -138,8 +160,8 @@ git checkout -b "$BRANCH"
 **Skills:** `skill_cicd_infrastructure`, `skill_ops_runbook`  
 **Inputs:** `{{PARSER_OUTPUT}}`, `{{CODER_OUTPUT}}`  
 **Outputs:**
-- `ops/Dockerfile` (updated)
-- `.github/workflows/ci.yml` (updated)
+- `ops/Dockerfile` (updated or created)
+- `.github/workflows/ci.yml` (updated or created)
 - `ops/runbooks/day_{{DAY_NUMBER}}_runbook.md`
 
 **Gate to Phase 4b — all must be true:**
@@ -166,7 +188,7 @@ git checkout -b "$BRANCH"
    - Set `current_phase: 1`
    - Append each blocker to `incomplete_tasks`
    - Mark all Phase Outputs for the day ❌
-4. **Restart from Phase 1.** No new day begins until a PASS verdict is issued.
+4. **Restart from Phase 1.** No new session begins until a PASS verdict is issued.
 
 ---
 
@@ -175,16 +197,17 @@ git checkout -b "$BRANCH"
 **Inputs:** All upstream outputs + merged PR data
 
 **Required writes (all mandatory):**
-1. **Append** new row to `## Completed Days`: Day, title, key outputs, notes, status (✅/⏳/❌).
+1. **Append** new row to `## Completed Days`: Day, milestone, key outputs, notes, status (✅/⏳/❌).
 2. **Append** new rows to `## Active Dependency Map` for new foundational resources. Update "Consumed By" for existing resources with new consumers.
 3. **Replace** `## Active Infrastructure Snapshot` with current state of all services, DBs, queues, pipelines.
 4. **Update** `## Carry-Forward Items`: remove resolved items, append new unresolved decisions/homework.
 5. **Append** permanent tech choices / API contract freezes to `## Architectural Decisions Log`.
 6. **Replace** `## Last Session Summary` with today's date, day number, and 3-bullet hand-off note.
-7. **Changelog:** write or append to `changelog/YYYY-MM-DD.md`:
+7. **Update** `docs/platform_roadmap.md §Phase {{phase_plan}}` component status table: mark completed components ✅, failed/blocked ❌. Do not touch components not touched this session.
+8. **Changelog:** write or append to `changelog/YYYY-MM-DD.md`:
    ```markdown
-   ## Day {{DAY_NUMBER}} — {{DELIVERABLE_TITLE}}
-   **MR:** [feat(day-{{DAY_NUMBER}}): {{TITLE}}]({{PR_URL}}) · merged `{{SHA}}`
+   ## Day {{DAY_NUMBER}} — {{MILESTONE}}: {{MILESTONE_TITLE}}
+   **MR:** [feat(day-{{DAY_NUMBER}}): {{SLUG}}]({{PR_URL}}) · merged `{{SHA}}`
 
    ### Changed
    - <bullet per shipped item>
@@ -195,22 +218,23 @@ git checkout -b "$BRANCH"
    ### Fixed
    - <bullet per resolved carry-forward, or "None">
    ```
-8. **Validate:** run `./scripts/validate_state.sh {{DAY_NUMBER}}` → must exit 0.
-9. Update `current_state.md`: increment `current_day`, set `current_phase: 0`, clear `incomplete_tasks`.
+9. **Validate:** run `./scripts/validate_state.sh {{DAY_NUMBER}}` → must exit 0.
+10. Update `current_state.md`: increment `current_day`, set `current_phase: 0`, clear `incomplete_tasks`.
 
 > **Rule:** Never truncate or rewrite history. Append only — except `## Last Session Summary` and `## Active Infrastructure Snapshot`, which are full replacements.
 
 ---
 
-## 4. Gate Flow
+## 5. Gate Flow
 
 ```
 Phase 0 ──gate──▶ [Phase 0b] ──▶ Phase 1 ──gate──▶ Phase 2 ──gate──▶ Phase 4 ──gate──▶ Phase 4b
                                                                                               │
-                         ◀──── FAIL: discard day artifacts · append incomplete_tasks · restart Phase 1 ────┘
+                    ◀──── FAIL: discard artifacts · append incomplete_tasks · restart Phase 1 ┘
                                                                                               │
                                                                                          PASS ▼
                                                                                         Phase 5
+                                                                                    (update roadmap ✅)
 ```
 
 Each `──gate──▶` is a hard stop. Gates are verified by the Orchestrator before invoking the next agent.  
@@ -218,32 +242,34 @@ Each `──gate──▶` is a hard stop. Gates are verified by the Orchestrato
 
 ---
 
-## 5. Day Sequencing Rule
+## 6. Day Sequencing Rule
 
-> **Serial days only.** Day N+1 MUST NOT begin until Day N's Phase 4b issues a PASS verdict and the feature branch is squash-merged into `develop`.
+> **Serial sessions only.** Session N+1 MUST NOT begin until Session N's Phase 4b issues a PASS verdict and the feature branch is squash-merged into `develop`.
 
 Enforced at Phase 0:
-- `current_phase: 0` AND `incomplete_tasks: []` → safe to proceed to Day N+1.
+- `current_phase: 0` AND `incomplete_tasks: []` → safe to proceed.
 - Any other state → surface blockers, do not increment `current_day`.
 
 ---
 
-## 6. Agent Handoff Protocol
+## 7. Agent Handoff Protocol
 
-1. Each agent receives inputs as **file references** (e.g. `@docs/architecture/day_01_spec.md`).
+1. Each agent receives inputs as **file references** (e.g. `@docs/platform_roadmap.md`, `@docs/architecture/day_01_spec.md`).
 2. Each agent emits outputs as **named artifacts** declared in its `## Output Constraints`.
 3. The Orchestrator resolves all `{{VARIABLE}}` tokens before passing context to agents.
 4. **Agents do not communicate directly.** All routing passes through the Orchestrator.
 
 ---
 
-## 7. Artifact Registry
+## 8. Artifact Registry
 
 | Phase | Artifact | Path |
 |---|---|---|
+| 0 | Scope derivation | Inline in Session Plan (`{{MILESTONE}}` resolved) |
 | 1 | Architecture Spec | `docs/architecture/day_{{DAY_NUMBER}}_spec.md` |
 | 2 | Commit Log + Branch | Inline in Developer output + `origin/feature/day-{{DAY_NUMBER}}-{{SLUG}}` |
 | 4 | Ops Bundle | `ops/Dockerfile`, `.github/workflows/ci.yml`, `ops/runbooks/day_{{DAY_NUMBER}}_runbook.md` |
 | 4b | Review Report | `docs/architecture/day_{{DAY_NUMBER}}_review_report.md` |
 | 4b | Merged PR | `develop` branch squash commit |
+| 5 | Roadmap update | `docs/platform_roadmap.md` component status (✅ per completed component) |
 | 5 | Changelog Entry | `changelog/YYYY-MM-DD.md` |
