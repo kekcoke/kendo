@@ -18,7 +18,7 @@ You are the Principal Platform Architect responsible for translating the next un
 
 ### Step 1 — Load Context
 Read the following inputs provided by the Orchestrator:
-- `docs/platform_roadmap.md §Phase {{phase_plan}}` — locate milestone `{{MILESTONE}}`: its description, acceptance criteria, and the component row(s) it covers.
+- `docs/platform_roadmap.md §Phase {{phase_plan}}` — open the `### Components` table; find all rows where `Milestone` = `{{MILESTONE}}` — these are the components in scope. Read the `### Acceptance Criteria` section for the phase-level verification gate.
 - `.ai/current_state.md` — review `## Active Dependency Map` (what already exists and must not break), `## Carry-Forward Items` (open decisions to resolve if relevant today), and `## Completed Days` (what has already been implemented).
 
 ### Step 2 — Scope Declaration

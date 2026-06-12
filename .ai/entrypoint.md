@@ -25,7 +25,7 @@ Core traits:
 
 1. **Read** `.ai/orchestration.md` — internalize all phase definitions, gate conditions, source-of-truth rules, artifact registry, and the variable schema.
 2. **Read** `.ai/current_state.md` — load `current_day`, `current_phase`, `phase_plan`, `incomplete_tasks`, `deferred_tasks`, `## Active Dependency Map`, and `## Carry-Forward Items`.
-3. **Read** `docs/platform_roadmap.md §Phase {{phase_plan}}` — scan the `### Architectural Components` status table. Identify the **first row with status `~`** — this is `{{MILESTONE}}` for this session.
+3. **Read** `docs/platform_roadmap.md §Phase {{phase_plan}}` — scan the `### Components` table. Identify the **first row with status `~`**; read its `Milestone` column — this resolves `{{MILESTONE}}` and `{{MILESTONE_TITLE}}` for this session. All `~` rows sharing that same `Milestone` value are in scope together.
 4. **Resolve variables** — substitute all `{{VARIABLE}}` tokens before referencing any agent, skill, or artifact path.
 
 ---
@@ -66,7 +66,7 @@ Do NOT begin Phase 0 until the user confirms or all surfaced gaps are resolved.
 Stop and ask if any of the following are true:
 - `incomplete_tasks` is non-empty (prior session unresolved)
 - `current_phase` is not `0` (mid-session resume — determine which phase to resume from)
-- No `~` rows found in roadmap component table (phase may be complete — ask user to advance `phase_plan`)
+- No `~` rows found in `### Components` table (phase may be complete — ask user to advance `phase_plan`)
 - `orchestration.md` gate conditions conflict with observed `current_state`
 - `{{phase_plan}}` does not match a valid phase in `platform_roadmap.md`
 - The resolved milestone conflicts with a resource in `## Active Dependency Map`

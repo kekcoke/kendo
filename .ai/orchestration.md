@@ -29,10 +29,10 @@
 
 | Document | Role |
 |---|---|
-| `docs/platform_roadmap.md §Phase {{phase_plan}}` | Defines milestones, acceptance criteria, and the component status table (✅/~/❌) |
+| `docs/platform_roadmap.md §Phase {{phase_plan}}` | Defines acceptance criteria (phase gate) and the `### Components` table with milestone + status per component |
 | `.ai/current_state.md` | Tracks per-day phase outputs, carry-forward items, incomplete tasks, and dependency map |
 
-**Scope derivation rule (Phase 0):** The Orchestrator reads the `### Architectural Components` table for `§Phase {{phase_plan}}` and identifies the first row with status `~` (not yet started). That component's parent milestone becomes `{{MILESTONE}}` for the session. Multiple adjacent `~` milestones may be grouped into one session only if the Architect explicitly scopes them and the combined work is achievable in a single day.
+**Scope derivation rule (Phase 0):** The Orchestrator reads the `### Components` table for `§Phase {{phase_plan}}` and identifies the first row with status `~` (not yet started). The `Milestone` column value of that row (e.g. `M1.1 — Multi-service scaffold`) becomes `{{MILESTONE}}` and `{{MILESTONE_TITLE}}` for the session. Multiple adjacent `~` rows sharing the same `Milestone` value are always grouped into one session — they form a single atomic deliverable.
 
 ---
 
@@ -57,7 +57,7 @@ If either check fails: surface the issue and document it in `current_state.md §
 **Actions (in order):**
 1. Read `current_state.md` in full. Load: `## Completed Days`, `## Active Dependency Map`, `## Carry-Forward Items`.
 2. Check `incomplete_tasks` — if non-empty → **halt**. Surface each blocker. Do not advance to Phase 1.
-3. Read `docs/platform_roadmap.md §Phase {{phase_plan}}` component status table. Find the first `~` row. Resolve `{{MILESTONE}}` and `{{MILESTONE_TITLE}}`.
+3. Read `docs/platform_roadmap.md §Phase {{phase_plan}}` `### Components` table. Find the first `~` row. Read its `Milestone` column — this resolves both `{{MILESTONE}}` (e.g. `M1.1`) and `{{MILESTONE_TITLE}}` (e.g. `Multi-service scaffold`). Group all `~` rows sharing that milestone value — they are treated as a single atomic deliverable this session.
 4. If all components in the phase are ✅ → surface "Phase {{phase_plan}} complete" and prompt user to advance `phase_plan` before proceeding.
 5. Confirm the resolved milestone does not conflict with any dependency in `## Active Dependency Map`.
 6. Resolve `{{DAY_NUMBER}}`, `{{BRANCH_BASE}}`, and `{{phase_plan}}` for this session.
