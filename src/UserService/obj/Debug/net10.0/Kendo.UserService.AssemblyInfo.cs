@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Kendo.UserService")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ade62b73db0de35a0d8b4dc3c90a26e362d95847")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+179eaebdf35e92202ee6df2c4b4c1d3fe33ecc0d")]
 [assembly: System.Reflection.AssemblyProductAttribute("Kendo.UserService")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Kendo.UserService")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
