@@ -33,16 +33,16 @@
 
 | Component | Description | Status |
 |---|---|---|
-| `.NET 10 Web API (Gateway)` | MVC Controllers, JWT Bearer auth, rate limiting middleware | ~ |
-| `User Service` | MVC Controllers, EF Core, pgvector schema, Data Annotations | ~ |
-| `Background Worker` | .NET Worker Service, scoped DI, hosted lifecycle | ~ |
+| `.NET 10 Web API (Gateway)` | MVC Controllers, JWT Bearer auth, rate limiting middleware | ✅ (scaffold) |
+| `User Service` | MVC Controllers, EF Core, pgvector schema, Data Annotations | ✅ (scaffold) |
+| `Background Worker` | .NET Worker Service, scoped DI, hosted lifecycle | ✅ (scaffold) |
 | `Polly Circuit Breaker` | Policy applied to all DB clients + external HTTP `HttpClient` | ~ |
 | `Polly Retry` | Exponential backoff, transient-fault predicate, jitter | ~ |
 | `OpenTelemetry` | Traces + structured logs, console exporter, trace-ID in all logs | ~ |
 | `RFC 7807 Problem Details` | Exception-handling middleware, all error responses standardized | ~ |
-| `Health Check Endpoints` | `/health/live` + `/health/ready` per service, wired to Docker | ~ |
+| `Health Check Endpoints` | `/health/live` + `/health/ready` per service, wired to Docker | ✅ |
 | `pgvector` | Extension initialized, migration applied, embedding column present | ~ |
-| `Docker Compose` | All services containerized, health checks configured | ~ |
+| `Docker Compose` | All services containerized, health checks configured | ✅ |
 
 ---
 

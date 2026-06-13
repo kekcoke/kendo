@@ -39,7 +39,7 @@ check_file "ops/runbooks/day_${DAY_PAD}_runbook.md"             "Phase 4: Ops Ru
 
 # ── 3. current_state.md structure checks ─────────────────────────────────────
 check_grep "$STATE" "current_phase: 0"        "current_phase reset to 0"
-check_grep "$STATE" "incomplete_tasks"         "## Incomplete Tasks section"
+check_grep "$STATE" "Incomplete Tasks"          "## Incomplete Tasks section"
 check_grep "$STATE" "## Completed Days"        "## Completed Days section"
 check_grep "$STATE" "## Carry-Forward Items"   "## Carry-Forward Items section"
 check_grep "$STATE" "## Architectural Decisions Log" "## Architectural Decisions Log section"
