@@ -31,3 +31,9 @@
 /Users/kevinoane/Desktop/portfolio/kendo/src/Gateway/obj/Debug/net10.0/Kendo.Gateway.pdb
 /Users/kevinoane/Desktop/portfolio/kendo/src/Gateway/obj/Debug/net10.0/Kendo.Gateway.genruntimeconfig.cache
 /Users/kevinoane/Desktop/portfolio/kendo/src/Gateway/obj/Debug/net10.0/ref/Kendo.Gateway.dll
+/Users/kevinoane/Desktop/portfolio/kendo/src/Gateway/bin/Debug/net10.0/Microsoft.Extensions.Http.Polly.dll
+/Users/kevinoane/Desktop/portfolio/kendo/src/Gateway/bin/Debug/net10.0/Polly.dll
+/Users/kevinoane/Desktop/portfolio/kendo/src/Gateway/bin/Debug/net10.0/Polly.Extensions.Http.dll
+/Users/kevinoane/Desktop/portfolio/kendo/src/Gateway/bin/Debug/net10.0/Polly.Core.dll
+/Users/kevinoane/Desktop/portfolio/kendo/src/Gateway/bin/Debug/net10.0/Kendo.Shared.dll
+/Users/kevinoane/Desktop/portfolio/kendo/src/Gateway/bin/Debug/net10.0/Kendo.Shared.pdb

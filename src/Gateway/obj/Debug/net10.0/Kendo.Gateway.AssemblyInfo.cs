@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Kendo.Gateway")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ade62b73db0de35a0d8b4dc3c90a26e362d95847")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e447ae4c4d954171a6f8f24ee84ea2e61ba8bbfb")]
 [assembly: System.Reflection.AssemblyProductAttribute("Kendo.Gateway")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Kendo.Gateway")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
