@@ -38,7 +38,7 @@
 | `Background Worker` | .NET Worker Service, scoped DI, hosted lifecycle | ✅ (scaffold) |
 | `Polly Circuit Breaker` | Policy applied to all DB clients + external HTTP `HttpClient` | ✅ |
 | `Polly Retry` | Exponential backoff, transient-fault predicate, jitter | ✅ |
-| `OpenTelemetry` | Traces + structured logs, console exporter, trace-ID in all logs | ~ |
+| `OpenTelemetry` | Traces + structured logs, console exporter, trace-ID in all logs | ✅ |
 | `RFC 7807 Problem Details` | Exception-handling middleware, all error responses standardized | ~ |
 | `Health Check Endpoints` | `/health/live` + `/health/ready` per service, wired to Docker | ✅ |
 | `pgvector` | Extension initialized, migration applied, embedding column present | ✅ (extension + migration) |

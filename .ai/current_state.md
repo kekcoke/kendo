@@ -1,15 +1,15 @@
 # Infraspekt — Current State
 > **Live checkpoint.** Updated by the Orchestrator at the end of every phase.  
 > Rule: never truncate history. Append only — except `## Last Session Summary` and `## Active Infrastructure Snapshot` (full replacements).  
-> Last updated: 2026-06-13
+> Last updated: 2026-06-13 (Day 04)
 
 ---
 
 ## Session Variables
 
 ```yaml
-current_day: 4
-current_phase: 1        # 0=Init · 0b=Bootstrap · 1=Architect · 2=Dev+QA · 4=DevOps · 4b=Review · 5=State Update
+current_day: 5
+current_phase: 0        # 0=Init · 0b=Bootstrap · 1=Architect · 2=Dev+QA · 4=DevOps · 4b=Review · 5=State Update
 branch_base: develop
 feature_branch: ~       # resolved in Phase 1 from {{SLUG}}
 phase_plan: "01"        # platform_roadmap.md phase reference
@@ -20,9 +20,9 @@ phase_plan: "01"        # platform_roadmap.md phase reference
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* M1.2 database layer delivered: PostgreSQL 16 + pgvector provisioned, EF Core DbContext wired, initial migration applied, connection string externalized.
-* 12/12 xUnit tests passing; 4 Docker Compose services healthy (Gateway, UserService, Worker, PostgreSQL).
-* Next: M1.3 — Resilience baseline (Polly Circuit Breaker + Retry on all DB and HTTP clients). Carry-forward: RFC 7807 error schema (target M1.5).
+* M1.4 observability foundation delivered: OpenTelemetry console exporter, trace-ID correlation in all logs, structured Polly callback logging across all services. CI PostgreSQL container resolved.
+* 29/29 xUnit tests passing (8 unit + 4 data + 13 resilience + 4 observability); CI `build-and-test` job now has pgvector service container.
+* Next: M1.5 — RFC 7807 Problem Details error schema (standardized error responses). Carry-forward: none new.
 
 ---
 
@@ -68,6 +68,20 @@ phase_plan: "01"        # platform_roadmap.md phase reference
 
 ---
 
+## Phase Outputs — Day 04
+> Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
+
+| Phase | Artifact | Status |
+|---|---|---|
+| 0 | State initialized, variables resolved → M1.4 Observability foundation | ✅ |
+| 1 | `docs/architecture/day_04_spec.md` | ✅ |
+| 2 | Commit log — zero halted units — feature branch on `origin` | ✅ |
+| 4 | `ops/Dockerfile` · `.github/workflows/ci.yml` · `ops/runbooks/day_04_runbook.md` | ✅ |
+| 4b | `docs/architecture/day_04_review_report.md` + PR merged to `develop` | ✅ |
+| 5 | State update, roadmap update, changelog, validation | ✅ |
+
+---
+
 ## Incomplete Tasks
 > Tasks started this day but halted (lint/test failure, spec ambiguity, reviewer FAIL routing).  
 > **Must be empty before Day N+1 can begin.** Populated by Reviewer FAIL verdict or commit-gate halt.
@@ -89,7 +103,6 @@ phase_plan: "01"        # platform_roadmap.md phase reference
 > Open blockers, homework, and unresolved decisions. Remove when resolved; append when new ones arise.
 
 - Define global RFC 7807 error schema for the API layer. *(carried from Day 00, target: M1.5)*
-- CI `build-and-test` job needs PostgreSQL service container — data integration tests fail without it. *(carried from Day 03, target: M1.4 or chore PR)*
 
 ---
 
@@ -101,6 +114,7 @@ phase_plan: "01"        # platform_roadmap.md phase reference
 | 01 | Multi-service scaffold | Gateway + UserService + Worker, Docker Compose, CI pipeline, 8 tests | PR #2 merged to develop | ✅ |
 | 02 | Database layer | PostgreSQL 16 + pgvector, EF Core DbContext, initial migration, connection string externalized, 12 tests | PR #3 merged to develop | ✅ |
 | 03 | Resilience baseline | Polly Retry + Circuit Breaker on DB + HTTP clients, shared resilience pipeline, 25 tests (13 resilience), CI updated | PR #4 merged to develop | ✅ |
+| 04 | Observability foundation | OpenTelemetry console exporter, trace-ID correlation, structured Polly logging, CI PostgreSQL fix, 29 tests (4 observability) | PR #5 merged to develop | ✅ |
 
 ---
 
@@ -124,9 +138,10 @@ phase_plan: "01"        # platform_roadmap.md phase reference
 * **Services:** Gateway (port 5000), UserService (port 5001), Worker (port 5002), PostgreSQL (port 5432) — all containerized
 * **Docker Compose:** All four services with health checks; PostgreSQL (5s interval), app services (10s interval); `depends_on` postgres healthy → userservice
 * **Database:** PostgreSQL 16 + pgvector (`pgvector/pgvector:pg16`), `kendo_users` DB, `vector` extension enabled via EF Core migration
-* **Branches:** `main` (scaffolding), `develop` (PR #4 squash-merged — Day 03) — both on `origin`
-* **Pipelines:** CI pipeline active (`.github/workflows/ci.yml`) — build → unit tests → data integration tests → resilience tests → docker compose health verification
-* **Tests:** 25/25 xUnit tests passing (8 health-check + 4 data integration + 13 resilience)
+* **Branches:** `main` (scaffolding), `develop` (PR #5 squash-merged — Day 04) — both on `origin`
+* **Pipelines:** CI pipeline active (`.github/workflows/ci.yml`) — build → unit tests → data integration tests (with pgvector service container) → resilience tests → docker compose health verification. OTel observability tests added to suite.
+* **Tests:** 29/29 xUnit tests passing (8 health-check + 4 data integration + 13 resilience + 4 observability)
+* **Observability:** All 3 services emit OpenTelemetry traces to console exporter; trace IDs correlated in all ILogger log lines; Polly callbacks emit structured logs with trace context
 * **Local:** API instances: 3 (Gateway, UserService, Worker), Postgres: 1 (Docker), RabbitMQ: 1 (infrastructure), Redis: 1 (infrastructure)
 
 ---
@@ -145,3 +160,5 @@ phase_plan: "01"        # platform_roadmap.md phase reference
 * **pgvector:** `vector` extension enabled in all EF Core migrations; `HasPostgresExtension("vector")` applied at model level. *(Day 02)*
 * **Shared Library:** `Kendo.Shared` class library introduced — houses resilience pipeline, options, HTTP handler, and future shared concerns (RFC 7807 middleware, OpenTelemetry config). All services reference it. *(Day 03)*
 * **Polly Resilience:** All DB and HTTP calls wrapped in Polly v8 Retry (3 attempts, exponential backoff + jitter) + Circuit Breaker (3 consecutive failures → 30s break). Config externalized via `Resilience` appsettings section. *(Day 03)*
+* **OpenTelemetry:** All services emit OpenTelemetry traces to console exporter via `AddKendoObservability()` extension method in `Kendo.Shared`. Trace IDs auto-correlated in `ILogger` output via ASP.NET Core `Activity.Current.TraceId`. Console exporter for dev/CI; OTLP exporter conditionally switchable via `OTEL_EXPORTER_OTLP_ENDPOINT` in production. *(Day 04)*
+* **CI PostgreSQL:** CI `build-and-test` job uses `pgvector/pgvector:pg16` service container for data integration tests. Connection string externalized via `ConnectionStrings__DefaultConnection` env var. *(Day 04)*
