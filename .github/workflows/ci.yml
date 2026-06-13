@@ -9,6 +9,20 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: kendo_users
+          POSTGRES_USER: kendo
+          POSTGRES_PASSWORD: kendo_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -25,6 +39,8 @@ jobs:
 
       - name: Run data integration tests
         run: dotnet test src/Kendo.slnx --filter "Category=Data" --no-build
+        env:
+          ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=kendo_users;Username=kendo;Password=kendo_dev
 
       - name: Run resilience tests
         run: dotnet test src/Kendo.slnx --filter "Category=Resilience" --no-build
