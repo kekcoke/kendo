@@ -23,6 +23,9 @@ jobs:
       - name: Run unit tests
         run: dotnet test src/Kendo.slnx --filter "Category=Unit" --no-build
 
+      - name: Run data integration tests
+        run: dotnet test src/Kendo.slnx --filter "Category=Data" --no-build
+
   docker-compose:
     runs-on: ubuntu-latest
     needs: build-and-test
