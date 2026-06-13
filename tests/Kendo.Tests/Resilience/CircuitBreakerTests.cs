@@ -1,4 +1,5 @@
 using Kendo.Shared.Resilience;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 
@@ -25,7 +26,7 @@ public class CircuitBreakerTests
     public async Task CircuitBreaker_Trips_AfterConsecutiveFailures()
     {
         var options = Options.Create(CreateOptions(failureThreshold: 3, breakDurationSeconds: 30));
-        var pipeline = new PollyResiliencePipeline(options);
+        var pipeline = new PollyResiliencePipeline(options, Mock.Of<ILogger<PollyResiliencePipeline>>());
         var failures = 0;
 
         // Execute failures up to and past the threshold
@@ -53,7 +54,7 @@ public class CircuitBreakerTests
     public async Task CircuitBreaker_Resets_AfterBreakDuration()
     {
         var options = Options.Create(CreateOptions(failureThreshold: 2, breakDurationSeconds: 1));
-        var pipeline = new PollyResiliencePipeline(options);
+        var pipeline = new PollyResiliencePipeline(options, Mock.Of<ILogger<PollyResiliencePipeline>>());
 
         // Trip the circuit breaker
         for (int i = 0; i < 3; i++)
@@ -83,7 +84,7 @@ public class CircuitBreakerTests
     public async Task CircuitBreaker_ThrowsBrokenCircuit_WhenOpen()
     {
         var options = Options.Create(CreateOptions(failureThreshold: 2, breakDurationSeconds: 30));
-        var pipeline = new PollyResiliencePipeline(options);
+        var pipeline = new PollyResiliencePipeline(options, Mock.Of<ILogger<PollyResiliencePipeline>>());
 
         // Trip the circuit breaker with a single failure
         try { await pipeline.ExecuteAsync(ct => throw new InvalidOperationException("Fail")); }
@@ -108,7 +109,7 @@ public class CircuitBreakerTests
     public async Task CircuitBreaker_Generic_ReturnsResult()
     {
         var options = Options.Create(CreateOptions(failureThreshold: 3, breakDurationSeconds: 30));
-        var pipeline = new PollyResiliencePipeline(options);
+        var pipeline = new PollyResiliencePipeline(options, Mock.Of<ILogger<PollyResiliencePipeline>>());
 
         var result = await pipeline.ExecuteAsync(ct => Task.FromResult(42));
 

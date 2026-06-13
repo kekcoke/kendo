@@ -1,5 +1,7 @@
 using Kendo.Shared.Resilience;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Moq;
 
 namespace Kendo.Tests.Resilience;
 
@@ -30,7 +32,7 @@ public class RetryPolicyTests
     public async Task Retry_RetriesTransientFailures()
     {
         var options = Options.Create(CreateRetryOnlyOptions(maxRetries: 3));
-        var pipeline = new PollyResiliencePipeline(options);
+        var pipeline = new PollyResiliencePipeline(options, Mock.Of<ILogger<PollyResiliencePipeline>>());
         var attempts = 0;
 
         // Succeeds on 3rd attempt
@@ -50,7 +52,7 @@ public class RetryPolicyTests
     public async Task Retry_ExhaustsRetries_AndThrowsLastException()
     {
         var options = Options.Create(CreateRetryOnlyOptions(maxRetries: 2));
-        var pipeline = new PollyResiliencePipeline(options);
+        var pipeline = new PollyResiliencePipeline(options, Mock.Of<ILogger<PollyResiliencePipeline>>());
         var attempts = 0;
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -69,7 +71,7 @@ public class RetryPolicyTests
     public async Task Retry_ExponentialBackoff_IsApplied()
     {
         var options = Options.Create(CreateRetryOnlyOptions(maxRetries: 2, baseDelayMs: 50));
-        var pipeline = new PollyResiliencePipeline(options);
+        var pipeline = new PollyResiliencePipeline(options, Mock.Of<ILogger<PollyResiliencePipeline>>());
         var attempts = 0;
         var startTime = DateTime.UtcNow;
 
@@ -92,7 +94,7 @@ public class RetryPolicyTests
     public async Task Retry_NoRetry_OnSuccess()
     {
         var options = Options.Create(CreateRetryOnlyOptions(maxRetries: 3));
-        var pipeline = new PollyResiliencePipeline(options);
+        var pipeline = new PollyResiliencePipeline(options, Mock.Of<ILogger<PollyResiliencePipeline>>());
         var attempts = 0;
 
         var result = await pipeline.ExecuteAsync(ct =>

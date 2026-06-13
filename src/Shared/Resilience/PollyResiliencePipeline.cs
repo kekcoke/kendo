@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Retry;
@@ -8,9 +9,13 @@ namespace Kendo.Shared.Resilience;
 public class PollyResiliencePipeline : IResiliencePipeline, IDisposable
 {
     private readonly ResiliencePipeline _pipeline;
+    private readonly ILogger<PollyResiliencePipeline> _logger;
 
-    public PollyResiliencePipeline(IOptions<ResilienceOptions> options)
+    public PollyResiliencePipeline(
+        IOptions<ResilienceOptions> options,
+        ILogger<PollyResiliencePipeline> logger)
     {
+        _logger = logger;
         var opts = options.Value;
 
         var retryOptions = new RetryStrategyOptions
@@ -23,7 +28,12 @@ public class PollyResiliencePipeline : IResiliencePipeline, IDisposable
                 .Handle<Exception>(),
             OnRetry = args =>
             {
-                // Structured log placeholder — OpenTelemetry correlation arrives in M1.4
+                _logger.LogWarning(
+                    "Retry attempt {Attempt}/{MaxRetries} after {Delay}ms — {ExceptionMessage}",
+                    args.AttemptNumber + 1,
+                    opts.Retry.MaxRetries,
+                    opts.Retry.BaseDelayMs * (1 << args.AttemptNumber),
+                    args.Outcome.Exception?.Message);
                 return ValueTask.CompletedTask;
             }
         };
@@ -38,17 +48,22 @@ public class PollyResiliencePipeline : IResiliencePipeline, IDisposable
                 .Handle<Exception>(),
             OnOpened = args =>
             {
-                // Structured log placeholder
+                _logger.LogError(
+                    "Circuit breaker OPENED — {FailureThreshold} failures in {SamplingDuration}s",
+                    opts.CircuitBreaker.FailureThreshold,
+                    opts.CircuitBreaker.SamplingDurationSeconds);
                 return ValueTask.CompletedTask;
             },
             OnClosed = args =>
             {
-                // Structured log placeholder
+                _logger.LogInformation(
+                    "Circuit breaker CLOSED — normal operation resumed");
                 return ValueTask.CompletedTask;
             },
             OnHalfOpened = args =>
             {
-                // Structured log placeholder
+                _logger.LogInformation(
+                    "Circuit breaker HALF-OPENED — probe request allowed");
                 return ValueTask.CompletedTask;
             }
         };
