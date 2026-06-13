@@ -1,4 +1,5 @@
 using Kendo.Shared.Http;
+using Kendo.Shared.Observability;
 using Kendo.Shared.Resilience;
 using Kendo.Worker;
 
@@ -8,6 +9,7 @@ builder.Services.AddControllers();
 builder.Services.AddHostedService<WorkerBackgroundService>();
 
 builder.Services.AddKendoResilience(builder.Configuration);
+builder.Services.AddKendoObservability(builder.Configuration, "kendo-worker");
 
 builder.Services.AddHttpClient("default")
     .AddHttpMessageHandler<ResilienceDelegatingHandler>();
