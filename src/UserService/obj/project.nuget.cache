@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "I0Edmz33cGE=",
+  "success": true,
+  "projectFilePath": "/Users/kevinoane/Desktop/portfolio/kendo/src/UserService/Kendo.UserService.csproj",
+  "expectedPackageFiles": [
+    "/Users/kevinoane/.nuget/packages/microsoft.aspnetcore.openapi/10.0.8/microsoft.aspnetcore.openapi.10.0.8.nupkg.sha512",
+    "/Users/kevinoane/.nuget/packages/microsoft.openapi/2.0.0/microsoft.openapi.2.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}
