@@ -1,7 +1,9 @@
 using Kendo.Shared.Resilience;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Moq;
 
 namespace Kendo.Tests.Resilience;
 
@@ -78,7 +80,7 @@ public class ResiliencePipelineTests
             Retry = new RetryOptions { MaxRetries = 2, BaseDelayMs = 10, MaxDelayMs = 100, UseJitter = false },
             CircuitBreaker = new CircuitBreakerOptions { FailureThreshold = 10, BreakDurationSeconds = 30, SamplingDurationSeconds = 30 }
         });
-        var pipeline = new PollyResiliencePipeline(options);
+        var pipeline = new PollyResiliencePipeline(options, Mock.Of<ILogger<PollyResiliencePipeline>>());
         var attempts = 0;
 
         // Each ExecuteAsync exhausts retries (3 attempts), then fails → 1 CB failure
