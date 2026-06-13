@@ -2,11 +2,14 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /app
 
-COPY Kendo.Gateway.csproj .
-RUN dotnet restore
+# Copy all project files for restore layer caching
+COPY Gateway/Kendo.Gateway.csproj Gateway/
+COPY Shared/Kendo.Shared.csproj Shared/
+RUN dotnet restore Gateway/Kendo.Gateway.csproj
 
+# Copy all source and publish
 COPY . .
-RUN dotnet publish -c Release -o /out
+RUN dotnet publish Gateway/Kendo.Gateway.csproj -c Release -o /out
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app

@@ -2,11 +2,14 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /app
 
-COPY Kendo.Worker.csproj .
-RUN dotnet restore
+# Copy all project files for restore layer caching
+COPY Worker/Kendo.Worker.csproj Worker/
+COPY Shared/Kendo.Shared.csproj Shared/
+RUN dotnet restore Worker/Kendo.Worker.csproj
 
+# Copy all source and publish
 COPY . .
-RUN dotnet publish -c Release -o /out
+RUN dotnet publish Worker/Kendo.Worker.csproj -c Release -o /out
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app

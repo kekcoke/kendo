@@ -1,18 +1,31 @@
+using Kendo.Shared.ErrorHandling;
 using Kendo.Shared.Http;
 using Kendo.Shared.Observability;
 using Kendo.Shared.Resilience;
+using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
+
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+    options.SuppressModelStateInvalidFilter = true);
 
 builder.Services.AddKendoResilience(builder.Configuration);
 builder.Services.AddKendoObservability(builder.Configuration, "kendo-gateway");
+builder.Services.AddKendoErrorHandling();
 
 builder.Services.AddHttpClient("default")
     .AddHttpMessageHandler<ResilienceDelegatingHandler>();
 
 var app = builder.Build();
+
+app.UseKendoErrorHandling();
 
 app.MapControllers();
 

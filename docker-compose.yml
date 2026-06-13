@@ -1,8 +1,8 @@
 services:
   gateway:
     build:
-      context: ./src/Gateway
-      dockerfile: Dockerfile
+      context: ./src
+      dockerfile: Gateway/Dockerfile
     ports:
       - "5000:5000"
     environment:
@@ -17,8 +17,8 @@ services:
 
   userservice:
     build:
-      context: ./src/UserService
-      dockerfile: Dockerfile
+      context: ./src
+      dockerfile: UserService/Dockerfile
     ports:
       - "5001:5001"
     environment:
@@ -37,8 +37,8 @@ services:
 
   worker:
     build:
-      context: ./src/Worker
-      dockerfile: Dockerfile
+      context: ./src
+      dockerfile: Worker/Dockerfile
     ports:
       - "5002:5002"
     environment:
