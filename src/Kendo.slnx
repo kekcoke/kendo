@@ -8,5 +8,8 @@
   <Folder Name="/Worker/">
     <Project Path="Worker/Kendo.Worker.csproj" />
   </Folder>
+  <Folder Name="/Shared/">
+    <Project Path="Shared/Kendo.Shared.csproj" />
+  </Folder>
   <Project Path="../tests/Kendo.Tests/Kendo.Tests.csproj" />
 </Solution>
