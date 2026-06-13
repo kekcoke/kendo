@@ -9,7 +9,7 @@
 
 ```yaml
 current_day: 4
-current_phase: 0        # 0=Init · 0b=Bootstrap · 1=Architect · 2=Dev+QA · 4=DevOps · 4b=Review · 5=State Update
+current_phase: 1        # 0=Init · 0b=Bootstrap · 1=Architect · 2=Dev+QA · 4=DevOps · 4b=Review · 5=State Update
 branch_base: develop
 feature_branch: ~       # resolved in Phase 1 from {{SLUG}}
 phase_plan: "01"        # platform_roadmap.md phase reference
