@@ -1,7 +1,12 @@
 using Kendo.Worker;
 
-var builder = Host.CreateApplicationBuilder(args);
-builder.Services.AddHostedService<Worker>();
+var builder = WebApplication.CreateBuilder(args);
 
-var host = builder.Build();
-host.Run();
+builder.Services.AddControllers();
+builder.Services.AddHostedService<WorkerBackgroundService>();
+
+var app = builder.Build();
+
+app.MapControllers();
+
+app.Run();

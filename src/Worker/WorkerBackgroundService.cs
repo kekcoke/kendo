@@ -1,16 +1,20 @@
 namespace Kendo.Worker;
 
-public class Worker(ILogger<Worker> logger) : BackgroundService
+public class WorkerBackgroundService(ILogger<WorkerBackgroundService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            if (logger.IsEnabled(LogLevel.Information))
+            while (!stoppingToken.IsCancellationRequested)
             {
                 logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+                await Task.Delay(1000, stoppingToken);
             }
-            await Task.Delay(1000, stoppingToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // Graceful shutdown — expected on SIGTERM
         }
     }
 }

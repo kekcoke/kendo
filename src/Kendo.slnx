@@ -8,4 +8,5 @@
   <Folder Name="/Worker/">
     <Project Path="Worker/Kendo.Worker.csproj" />
   </Folder>
+  <Project Path="../tests/Kendo.Tests/Kendo.Tests.csproj" />
 </Solution>
