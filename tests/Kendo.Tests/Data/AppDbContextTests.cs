@@ -48,7 +48,8 @@ public class AppDbContextTests
         context.Database.EnsureCreated();
 
         var connection = context.Database.GetDbConnection();
-        connection.Open();
+        if (connection.State != System.Data.ConnectionState.Open)
+            connection.Open();
 
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT extname FROM pg_extension WHERE extname = 'vector'";
