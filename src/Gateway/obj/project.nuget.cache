@@ -1,11 +1,15 @@
 {
   "version": 2,
-  "dgSpecHash": "rS2kFptYDwk=",
+  "dgSpecHash": "2m8r+2LAr90=",
   "success": true,
   "projectFilePath": "/Users/kevinoane/Desktop/portfolio/kendo/src/Gateway/Kendo.Gateway.csproj",
   "expectedPackageFiles": [
     "/Users/kevinoane/.nuget/packages/microsoft.aspnetcore.openapi/10.0.8/microsoft.aspnetcore.openapi.10.0.8.nupkg.sha512",
-    "/Users/kevinoane/.nuget/packages/microsoft.openapi/2.0.0/microsoft.openapi.2.0.0.nupkg.sha512"
+    "/Users/kevinoane/.nuget/packages/microsoft.extensions.http.polly/10.0.9/microsoft.extensions.http.polly.10.0.9.nupkg.sha512",
+    "/Users/kevinoane/.nuget/packages/microsoft.openapi/2.0.0/microsoft.openapi.2.0.0.nupkg.sha512",
+    "/Users/kevinoane/.nuget/packages/polly/7.2.4/polly.7.2.4.nupkg.sha512",
+    "/Users/kevinoane/.nuget/packages/polly.core/8.7.0/polly.core.8.7.0.nupkg.sha512",
+    "/Users/kevinoane/.nuget/packages/polly.extensions.http/3.0.0/polly.extensions.http.3.0.0.nupkg.sha512"
   ],
   "logs": []
 }
