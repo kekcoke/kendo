@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/Gateway/">
+    <Project Path="Gateway/Kendo.Gateway.csproj" />
+  </Folder>
+  <Folder Name="/UserService/">
+    <Project Path="UserService/Kendo.UserService.csproj" />
+  </Folder>
+  <Folder Name="/Worker/">
+    <Project Path="Worker/Kendo.Worker.csproj" />
+  </Folder>
+  <Project Path="../tests/Kendo.Tests/Kendo.Tests.csproj" />
+</Solution>
