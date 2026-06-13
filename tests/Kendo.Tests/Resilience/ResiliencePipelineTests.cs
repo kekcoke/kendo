@@ -24,6 +24,8 @@ public class ResiliencePipelineTests
             .Build();
 
         var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<ILogger<PollyResiliencePipeline>>(Mock.Of<ILogger<PollyResiliencePipeline>>());
         services.AddKendoResilience(config);
         var provider = services.BuildServiceProvider();
 
