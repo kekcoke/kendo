@@ -10,11 +10,10 @@
 using System;
 using System.Reflection;
 
-[assembly: Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute("dotnet-Kendo.Worker-c1807134-dc58-40ea-b2d7-5995b369be92")]
 [assembly: System.Reflection.AssemblyCompanyAttribute("Kendo.Worker")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ade62b73db0de35a0d8b4dc3c90a26e362d95847")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+643203114c81a6162c653ca619d551864880454f")]
 [assembly: System.Reflection.AssemblyProductAttribute("Kendo.Worker")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Kendo.Worker")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
