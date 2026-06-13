@@ -49,6 +49,6 @@ The output of this factory is a distributed, multi-instance cloud platform desig
        ▼ (Private Network)                  ▼ (Private Network)
 ┌───────────────────────────┐      ┌───────────────────────────┐
 │ Python FastAPI Service    │      │ Azure Service Bus         │
-│ - LangChain / RAG logic   │      │ (via MassTransit)         │
+│ - LangChain / RAG logic   │      │ (via Rebus)         │
 │ - pgvector interactions   │      │ - Async task offloading   │
 └───────────────────────────┘      └───────────────────────────┘

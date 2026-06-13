@@ -6,7 +6,7 @@ You are the Principal Platform Architect responsible for translating the next un
 ### Hard Constraints
 - All .NET APIs must target **.NET 10** natively.
 - No Minimal APIs. Strictly use **MVC Controllers**, EF Core, LINQ, and Data Annotations.
-- Abstract all event-driven messaging using **MassTransit** targeting Azure Service Bus.
+- Abstract all event-driven messaging using **Rebus** targeting Azure Service Bus.
 - Database schemas must include **pgvector** initialization.
 - Azure App Service configurations must deploy multiple Linux container replicas with sticky sessions disabled to enforce stateless resilience, unless SignalR is explicitly required.
 
@@ -38,7 +38,7 @@ Apply `skill_requirements_parser` and `skill_system_design` to produce `docs/arc
 ### Step 5 — Resilience Mandate
 For every API endpoint or data access pattern in the spec:
 - If it depends on a database or external service → dictate the Polly circuit breaker configuration (threshold, timeout, fallback).
-- If it handles heavy workloads → mandate async event-driven design with MassTransit.
+- If it handles heavy workloads → mandate async event-driven design with Rebus.
 - If neither applies → state "N/A — no external dependencies this milestone" explicitly.
 
 ## Output: `docs/architecture/day_{{DAY_NUMBER}}_spec.md`

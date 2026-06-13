@@ -51,7 +51,7 @@
 **Goal:** Introduce message brokers to handle load spikes, prevent timeouts, and guarantee at-least-once delivery.
 
 ### Milestone Markers
-- **M2.1** MassTransit + Azure Service Bus wired: producer and consumer registered in DI; bus starts cleanly.
+- **M2.1** Rebus + Azure Service Bus wired: producer and consumer registered in DI; bus starts cleanly.
 - **M2.2** First async endpoint: at least one `POST` refactored to return `HTTP 202 Accepted` and publish a domain event.
 - **M2.3** Background consumer: message consumer implemented in Worker Service; idempotency key enforced on every handler.
 - **M2.4** Dead Letter Queue: DLQ consumer implemented; alert fires when DLQ depth exceeds threshold.
@@ -71,7 +71,7 @@
 
 | Component | Description | Status |
 |---|---|---|
-| `MassTransit` | Azure Service Bus transport, DI registration, topology configuration | ~ |
+| `Rebus` | Azure Service Bus transport, DI registration, topology configuration | ~ |
 | `Azure Service Bus` | Topic/subscription or queue provisioned; connection string externalized | ~ |
 | `Async `202` Endpoint` | At least one POST refactored; synchronous path removed | ~ |
 | `Message Consumer` | Worker Service handler, idempotency key enforced per message type | ~ |
@@ -98,7 +98,7 @@
 - [ ] Traffic distributes across ≥ 2 replicas; killing one replica produces zero client-visible errors within health-check TTL.
 - [ ] Chaos: DB downtime → circuit breaker trips → fallback response returned; no cascading failure to upstream services.
 - [ ] Chaos: Service crash → load balancer marks replica unhealthy within N seconds; traffic rerouted automatically.
-- [ ] Chaos: Network partition → MassTransit retry + outbox guarantees no message loss.
+- [ ] Chaos: Network partition → Rebus retry + outbox guarantees no message loss.
 - [ ] Rate limiter returns `429 Too Many Requests` with `Retry-After` header above the configured threshold.
 - [ ] Load shedding returns `503 Service Unavailable` with RFC 7807 body under simulated extreme concurrency.
 - [ ] All chaos tests run in CI and produce a structured pass/fail report; pipeline fails on any chaos regression.

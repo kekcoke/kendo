@@ -97,5 +97,5 @@ phase_plan: "01"        # platform_roadmap.md phase reference
 
 * **Resilience:** All internal synchronous HTTP calls use Circuit Breaker — 3-strike failure threshold; Polly policies on all DB clients and `HttpClient`.
 * **Scale:** All stateless APIs designed for `replicas: 3`; no in-process session state permitted.
-* **Messaging:** MassTransit targeting Azure Service Bus for all event-driven patterns.
+* **Messaging:** Rebus targeting Azure Service Bus for all event-driven patterns.
 * **Framework:** .NET 10 MVC Controllers + EF Core + Data Annotations — no Minimal APIs.
