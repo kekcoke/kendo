@@ -1,3 +1,4 @@
+using Kendo.Shared.Caching;
 using Kendo.Shared.ErrorHandling;
 using Kendo.Shared.Http;
 using Kendo.Shared.Messaging;
@@ -32,6 +33,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 
 builder.Services.AddKendoResilience(builder.Configuration);
 builder.Services.AddKendoObservability(builder.Configuration, "kendo-worker");
+builder.Services.AddKendoDistributedCache(builder.Configuration);
 builder.Services.AddKendoErrorHandling();
 builder.Services.AddKendoRebus(builder.Configuration, "consumer");
 
@@ -56,6 +58,7 @@ builder.Services.AddHostedService<DlqDepthMonitor>();
 var app = builder.Build();
 
 app.UseKendoErrorHandling();
+app.UseKendoReplicaIdentity();
 
 app.MapControllers();
 
