@@ -3,6 +3,7 @@ using Kendo.Shared.ErrorHandling;
 using Kendo.Shared.Http;
 using Kendo.Shared.Messaging;
 using Kendo.Shared.Observability;
+using Kendo.Shared.GracefulShutdown;
 using Kendo.Shared.RateLimiting;
 using Kendo.Shared.Resilience;
 using Microsoft.AspNetCore.Mvc;
@@ -25,12 +26,14 @@ builder.Services.AddKendoDistributedCache(builder.Configuration);
 builder.Services.AddKendoRateLimiting(builder.Configuration);
 builder.Services.AddKendoErrorHandling();
 builder.Services.AddKendoRebus(builder.Configuration, "producer");
+builder.Services.AddKendoGracefulShutdown(builder.Configuration);
 
 builder.Services.AddHttpClient("default")
     .AddHttpMessageHandler<ResilienceDelegatingHandler>();
 
 var app = builder.Build();
 
+app.UseMiddleware<GracefulShutdownMiddleware>();
 app.UseKendoLoadShedding();
 app.UseKendoRateLimiter();
 app.UseKendoErrorHandling();
