@@ -20,9 +20,9 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* Phase 02 complete (Milestones M2.1–M2.6 delivered). PR #12 squash-merged into `develop`.
-* 94/94 unit tests passing. Next scope: **Phase 03 — High Availability & Chaos Testing**.
-* Day 12 opens M3.1 — Load balancer: reverse proxy routing traffic across ≥ 2 container replicas per service.
+* **M3.1 complete** — NGINX reverse proxy with upstream load balancing across 3 gateway + 3 userservice + 3 worker replicas. Docker DNS round-robin, passive health checks, lazy upstream resolution via `resolver 127.0.0.11`.
+* CI pipeline includes multi-replica validation (11 containers) and health-check smoke tests through NGINX. 94/94 unit + 5 infrastructure integration tests passing.
+* Next: **M3.2** — Stateless validation: Redis session store, sticky-session disable, replica-identifying headers.
 
 ---
 
@@ -181,6 +181,7 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 | 09 | DLQ consumer & alerting (M2.4) | `DeadLetteredMessage` + `KendoRebusDlqConfiguration` in Shared; `DeadLetterHandler`, `DlqDepthMonitor`, `DlqRecord` in Worker; 11 new tests, runbook | PR #10 merged to develop | ✅ |
 | 10 | Transactional Outbox (M2.5) | `OutboxMessage` entity + filtered index + unique index; `KendoMessageSerializer`; `OutboxRelayService` BackgroundService; `OutboxRepository`; UsersController refactored; EF migration; 15 new tests | PR #11 merged to develop | ✅ |
 | 11 | Async observability: traceparent propagation (M2.6) | `OutboxMessage.TraceContext` column; ambient `Activity.Current?.Id` capture; `traceparent` Rebus header; child Activity in Worker handler; EF migration; 17 new tests | PR #12 merged to develop | ✅ |
+| 12 | Reverse proxy load balancer (M3.1) | `ops/nginx/nginx.conf`, `docker-compose.yml` NGINX + `expose:`, multi-replica CI, 5 infra tests, runbook | PR #14 squashed to `develop` | ✅ |
 
 ---
 

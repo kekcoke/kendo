@@ -109,7 +109,7 @@
 
 | Component | Description | Status |
 |---|---|---|
-| `Reverse Proxy / Load Balancer` | NGINX or Azure App Service, ≥ 2 replicas per service, health-check routing | ~ |
+| `Reverse Proxy / Load Balancer` | NGINX or Azure App Service, ≥ 2 replicas per service, health-check routing | ✅ |
 | `Stateless Services` | No sticky sessions; no in-process session state | ~ |
 | `Redis (or equivalent)` | External distributed cache / session store | ~ |
 | `Chaos Test Suite` | xUnit + Testcontainers; DB downtime, crash, partition scenarios | ~ |
