@@ -1,5 +1,6 @@
 using Kendo.Shared.ErrorHandling;
 using Kendo.Shared.Http;
+using Kendo.Shared.Messaging;
 using Kendo.Shared.Observability;
 using Kendo.Shared.Resilience;
 using Kendo.Worker;
@@ -20,6 +21,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 builder.Services.AddKendoResilience(builder.Configuration);
 builder.Services.AddKendoObservability(builder.Configuration, "kendo-worker");
 builder.Services.AddKendoErrorHandling();
+builder.Services.AddKendoRebus(builder.Configuration, "consumer");
 
 builder.Services.AddHttpClient("default")
     .AddHttpMessageHandler<ResilienceDelegatingHandler>();
