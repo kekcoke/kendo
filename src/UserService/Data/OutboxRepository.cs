@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Kendo.Shared.Messaging;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,12 +26,15 @@ public class OutboxRepository
     /// </summary>
     public virtual async Task AddAsync(KendoMessage message, CancellationToken ct = default)
     {
+        var activityId = Activity.Current?.Id;
+
         var outboxMessage = new OutboxMessage
         {
             MessageId = message.MessageId,
             MessageType = KendoMessageSerializer.GetMessageType(message),
             Payload = KendoMessageSerializer.Serialize(message),
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow,
+            TraceContext = activityId
         };
 
         _db.OutboxMessages.Add(outboxMessage);

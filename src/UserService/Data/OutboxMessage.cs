@@ -15,4 +15,11 @@ public class OutboxMessage
     public DateTimeOffset? ProcessedAt { get; set; }
     public int RetryCount { get; set; }
     public string? LastError { get; set; }
+
+    /// <summary>
+    /// W3C TraceContext traceparent value captured at write time.
+    /// Enables end-to-end trace correlation between the HTTP request Activity
+    /// and the consumer-side span in the Worker.
+    /// </summary>
+    public string? TraceContext { get; set; }
 }
