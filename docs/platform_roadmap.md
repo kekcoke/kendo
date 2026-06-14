@@ -115,6 +115,6 @@
 | `Chaos Test Suite` | xUnit + bash scripts; DB downtime, crash, partition scenarios | ✅ |
 | `Rate Limiter` | .NET rate limiting middleware; `429` + `Retry-After` enforced at Gateway | ✅ |
 | `Load Shedding` | Concurrency limiter policy; `503` RFC 7807 body under extreme load | ✅ |
-| `Graceful Shutdown` | `SIGTERM` handler + drain timeout on all services | ~ |
+| `Graceful Shutdown` | `SIGTERM` handler + drain timeout on all services | ✅ |
 | `Ops Runbooks` | `ops/runbooks/` — one file per failure scenario | ~ |
 | *(All Phase 01 + 02 components)* | Inherited and still passing all prior acceptance criteria | ~ |
