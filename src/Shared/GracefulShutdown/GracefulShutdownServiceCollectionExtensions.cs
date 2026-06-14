@@ -21,6 +21,13 @@ public static class GracefulShutdownServiceCollectionExtensions
         // Register middleware
         services.AddSingleton<GracefulShutdownMiddleware>();
 
+        // Register hosted service that triggers drain on SIGTERM
+        services.AddHostedService(sp =>
+        {
+            var tracker = sp.GetRequiredService<RequestTracker>();
+            return new GracefulShutdownHostedService(tracker, timeout);
+        });
+
         // Configure host shutdown timeout
         services.Configure<HostOptions>(options =>
         {
