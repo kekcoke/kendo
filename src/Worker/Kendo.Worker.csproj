@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Shared\Kendo.Shared.csproj" />
+    <ProjectReference Include="..\UserService\Kendo.UserService.csproj" />
   </ItemGroup>
 
 </Project>
