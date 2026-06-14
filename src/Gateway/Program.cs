@@ -1,5 +1,6 @@
 using Kendo.Shared.ErrorHandling;
 using Kendo.Shared.Http;
+using Kendo.Shared.Messaging;
 using Kendo.Shared.Observability;
 using Kendo.Shared.Resilience;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +20,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 builder.Services.AddKendoResilience(builder.Configuration);
 builder.Services.AddKendoObservability(builder.Configuration, "kendo-gateway");
 builder.Services.AddKendoErrorHandling();
+builder.Services.AddKendoRebus(builder.Configuration, "producer");
 
 builder.Services.AddHttpClient("default")
     .AddHttpMessageHandler<ResilienceDelegatingHandler>();

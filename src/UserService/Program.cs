@@ -1,4 +1,5 @@
 using Kendo.Shared.ErrorHandling;
+using Kendo.Shared.Messaging;
 using Kendo.Shared.Observability;
 using Kendo.Shared.Resilience;
 using Kendo.UserService.Data;
@@ -20,6 +21,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 builder.Services.AddKendoResilience(builder.Configuration);
 builder.Services.AddKendoObservability(builder.Configuration, "kendo-userservice");
 builder.Services.AddKendoErrorHandling();
+builder.Services.AddKendoRebus(builder.Configuration, "producer");
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
