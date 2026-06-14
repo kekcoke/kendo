@@ -86,7 +86,7 @@ services:
       worker:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/health/live"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/health/live"]
       interval: 10s
       timeout: 5s
       retries: 3
