@@ -77,17 +77,12 @@ jobs:
 
       - name: Verify health endpoints (single replica)
         run: |
-          echo "=== Gateway ==="
+          echo "=== Gateway via NGINX ==="
           curl -fsS http://localhost:5000/health/live
           curl -fsS http://localhost:5000/health/ready
           echo ""
-          echo "=== UserService ==="
-          curl -fsS http://localhost:5001/health/live
-          curl -fsS http://localhost:5001/health/ready
-          echo ""
-          echo "=== Worker ==="
-          curl -fsS http://localhost:5002/health/live
-          curl -fsS http://localhost:5002/health/ready
+          echo "=== NGINX self-health ==="
+          curl -fsS http://localhost:5000/nginx-health
 
       - name: Tear down (single replica)
         run: docker compose down
