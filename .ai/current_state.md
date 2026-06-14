@@ -1,15 +1,15 @@
 # Infraspekt — Current State
 > **Live checkpoint.** Updated by the Orchestrator at the end of every phase.  
 > Rule: never truncate history. Append only — except `## Last Session Summary` and `## Active Infrastructure Snapshot` (full replacements).  
-> Last updated: 2026-06-13 (Day 11)
+> Last updated: 2026-06-14 (Day 12)
 
 ---
 
 ## Session Variables
 
 ```yaml
-current_day: 12
-current_phase: 4        # 0=Init · 0b=Bootstrap · 1=Architect · 2=Dev+QA · 4=DevOps · 4b=Review · 5=State Update
+current_day: 13
+current_phase: 0        # 0=Init · 0b=Bootstrap · 1=Architect · 2=Dev+QA · 4=DevOps · 4b=Review · 5=State Update
 branch_base: develop
 feature_branch: ~       # resolved in Phase 1 from {{SLUG}}
 phase_plan: "03"        # platform_roadmap.md phase reference
@@ -20,9 +20,9 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* **M3.1 complete** — NGINX reverse proxy with upstream load balancing across 3 gateway + 3 userservice + 3 worker replicas. Docker DNS round-robin, passive health checks, lazy upstream resolution via `resolver 127.0.0.11`.
-* CI pipeline includes multi-replica validation (11 containers) and health-check smoke tests through NGINX. 94/94 unit + 5 infrastructure integration tests passing.
-* Next: **M3.2** — Stateless validation: Redis session store, sticky-session disable, replica-identifying headers.
+* **M3.2 complete** — Redis distributed cache (`AddStackExchangeRedisCache` / `AddDistributedMemoryCache` fallback) wired into all 3 services. `ReplicaIdentityMiddleware` appends `X-Kendo-Replica` header (Docker HOSTNAME) on every response. NGINX passes header through to caller. Redis service (redis:7-alpine) in Docker Compose. CI updated with Redis service container (6/12 health thresholds) and replica header verification.
+* 76/76 unit tests passing (7 new caching tests). CI fully green: build-and-test (56s) + docker-compose (1m35s). PR #15 squash-merged into `develop`.
+* Next: **M3.3** — Chaos suite: automated tests simulating DB downtime, service crash, and network partition — all integrated into CI.
 
 ---
 
@@ -126,21 +126,6 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 
 ---
 
-## Phase Outputs — Day 12
-> Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
-
-| Phase | Artifact | Status |
-|---|---|---|
-| 0 | State initialized, variables resolved → M3.2 Stateless validation | ✅ |
-| 0b | *Skipped* (repo has prior commits) | ✅ |
-| 1 | `docs/architecture/day_12_spec.md` | ✅ |
-| 2 | Commit log — 6/6 units committed, zero halted — feature branch on `origin` | ✅ |
-| 4 | `ops/Dockerfile` milestone label · `ops/runbooks/day_12_runbook.md` | ~ |
-| 4b | Review report + PR merged to `develop` | ~ |
-| 5 | State update, roadmap update, changelog, validation | ~ |
-
----
-
 ## Phase Outputs — Day 09
 > Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
 
@@ -197,6 +182,7 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 | 10 | Transactional Outbox (M2.5) | `OutboxMessage` entity + filtered index + unique index; `KendoMessageSerializer`; `OutboxRelayService` BackgroundService; `OutboxRepository`; UsersController refactored; EF migration; 15 new tests | PR #11 merged to develop | ✅ |
 | 11 | Async observability: traceparent propagation (M2.6) | `OutboxMessage.TraceContext` column; ambient `Activity.Current?.Id` capture; `traceparent` Rebus header; child Activity in Worker handler; EF migration; 17 new tests | PR #12 merged to develop | ✅ |
 | 12 | Reverse proxy load balancer (M3.1) | `ops/nginx/nginx.conf`, `docker-compose.yml` NGINX + `expose:`, multi-replica CI, 5 infra tests, runbook | PR #14 squashed to `develop` | ✅ |
+| 12 | Stateless validation & Redis (M3.2) | Redis distributed cache, replica identity middleware, X-Kendo-Replica header, sticky-session disable, 7 new tests (76 total) | PR #15 squashed to `develop` | ✅ |
 
 ---
 
@@ -207,7 +193,7 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 |---|---|---|---|---|
 | PostgreSQL | Database | Persistent state storage (pgvector enabled) | Day 00 | UserService |
 | RabbitMQ | Message Broker | Async workflow decoupling | Day 00 | ~ |
-| Redis | Cache / State | Distributed circuit breaker state | Day 00 | ~ |
+| Redis | Cache / State | Distributed cache for stateless session state, replica identity | Day 00 | Gateway, UserService, Worker |
 | Gateway | Web API | API routing, auth, rate limiting | Day 01 | Angular Web App, UserService |
 | UserService | Web API | User domain logic, EF Core | Day 01 | Gateway |
 | Worker | Background Service | Async processing, health endpoint, Rebus consumer | Day 01 | Rebus (ASB), Gateway, UserService |
@@ -222,16 +208,16 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 ## Active Infrastructure Snapshot
 > Full replacement each session. Reflects current known state of all services, DBs, queues, pipelines.
 
-* **Services:** Gateway (port 5000), UserService (port 5001), Worker (port 5002), PostgreSQL (port 5432) — all containerized
-* **Docker Compose:** All four services with health checks; PostgreSQL (5s interval), app services (10s interval); `depends_on` postgres healthy → userservice
+* **Services:** Gateway (port 5000 behind NGINX), UserService (port 5001 expose), Worker (port 5002 expose), PostgreSQL (port 5432), Redis (port 6379), NGINX (port 80 internal, 5000 host) — all containerized
+* **Docker Compose:** All 6 services with health checks; PostgreSQL (5s interval), app services (10s interval), Redis (5s interval), NGINX (10s interval, wget self-health); `depends_on` postgres healthy → userservice
 * **Database:** PostgreSQL 16 + pgvector (`pgvector/pgvector:pg16`), `kendo_users` DB, `vector` extension enabled via EF Core migration
 * **Messaging:** Rebus registered with Azure Service Bus transport — Gateway + UserService in producer mode (one-way client), Worker in consumer mode (polls `kendo-events`, 3 workers). Graceful skip when `Rebus__ConnectionString` is missing (local dev).
 * **Idempotency:** `IdempotencyRecords` table (WorkerDbContext) tracks message processing status (Processing/Completed/Failed). MessageId PK enforces uniqueness. Crash recovery re-processes messages left in Processing state. All handlers wrap DB ops in transactions.
-* **Branches:** `main` (scaffolding), `develop` (PR #12 squash-merged — Day 11) — both on `origin`
-* **Pipelines:** CI pipeline active (`.github/workflows/ci.yml`) — build → unit tests → data integration tests (with pgvector service container) → resilience tests → **messaging tests** → docker compose health verification. CI `Wait for healthy` step hardened to wait for all 4 services.
-* **Tests:** 94/94 unit tests passing (8 health-check + 4 data integration + 13 resilience + 4 observability + 10 ProblemDetails middleware + 4 Messaging registration + 7 Worker handler idempotency + 4 DeadLetterHandler + 7 DlqDepthMonitor + 6 OutboxSerializer + 5 OutboxRepository + 7 OutboxRelayService + 4 UsersController + 6 OutboxRepository trace + 3 OutboxRelayService trace + 4 UserCreatedEventHandler trace)
+* **Branches:** `main` (scaffolding), `develop` (PR #15 squash-merged — Day 12) — both on `origin`
+* **Pipelines:** CI pipeline active (`.github/workflows/ci.yml`) — build → unit tests → data integration tests (with pgvector + Redis service containers) → resilience tests → messaging tests → docker compose health verification (6 single-replica, 12 multi-replica) → replica header verification → traffic distribution check.
+* **Tests:** 76/76 unit tests passing (8 health-check + 4 data integration + 13 resilience + 4 observability + 10 ProblemDetails middleware + 4 Messaging registration + 7 Worker handler idempotency + 4 DeadLetterHandler + 7 DlqDepthMonitor + 6 OutboxSerializer + 5 OutboxRepository + 7 OutboxRelayService + 4 UsersController + 6 OutboxRepository trace + 3 OutboxRelayService trace + 4 UserCreatedEventHandler trace)
 * **Observability:** All 3 services emit OpenTelemetry traces to console exporter; trace IDs correlated in all ILogger log lines; Polly callbacks emit structured logs with trace context; error responses include trace ID in RFC 7807 `traceId` field
-* **Local:** API instances: 3 (Gateway, UserService, Worker), Postgres: 1 (Docker), RabbitMQ: 1 (infrastructure, not yet consumed), Redis: 1 (infrastructure)
+* **Local:** API instances: 3 (Gateway, UserService, Worker), Postgres: 1 (Docker), RabbitMQ: 1 (infrastructure, not yet consumed), Redis: 1 (Docker, wired, best-effort cache)
 
 ---
 
@@ -258,3 +244,6 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 * **DLQ Depth Monitoring — Polling Monitor:** `DlqDepthMonitor` BackgroundService polls ASB management API at configurable interval (default 60s). Alert fires via `LogLevel.Error` when depth exceeds configurable threshold (default 5). Rate-limited dedup prevents alert spam. *(Day 09)*
 * **Transactional Outbox — OutboxMessages table:** `OutboxMessage` entity in UserService's `AppDbContext` with filtered index `IX_OutboxMessages_Unprocessed` (WHERE ProcessedAt IS NULL) for relay polling and unique index `IX_OutboxMessages_MessageId` for deduplication. `OutboxRelayService` BackgroundService polls pending messages, publishes via Rebus `IBus.Send()`, and marks as processed. RetryCount + LastError fields enable failure tracking up to configurable MaxRetries (default: 5). *(Day 10)*
 * **Traceparent Correlation — Cross-process trace linking:** `OutboxMessage.TraceContext` column (nullable text) captures `Activity.Current?.Id` at outbox write time. `OutboxRelayService` forwards it as `traceparent` Rebus message header. `UserCreatedEventHandler.StartTraceActivity()` extracts header and creates child `Activity` linked to the producer trace. Defensive parsing — malformed headers fall back to fresh trace. Best-effort correlation design; null TraceContext handled gracefully. *(Day 11)*
+* **Distributed Cache — Redis / In-Memory Fallback:** `AddKendoDistributedCache()` extension in `Kendo.Shared.Caching` registers `StackExchangeRedis` when `Redis__ConnectionString` is set, falls back to `AddDistributedMemoryCache()` otherwise. Best-effort — cache miss on Redis returns null; no cascading failure. *(Day 12)*
+* **Replica Identity — X-Kendo-Replica Header:** `ReplicaIdentityMiddleware` reads Docker `$HOSTNAME` (fallback `Environment.MachineName` → "unknown") and appends `X-Kendo-Replica` header to all HTTP responses. NGINX passes through via `proxy_set_header X-Kendo-Replica $upstream_http_x_kendo_replica;`. *(Day 12)*
+* **Redis in Docker Compose:** `redis:7-alpine` with `redis-cli ping` health check. All 3 services receive `Redis__ConnectionString=redis:6379` env var. CI includes Redis service container. *(Day 12)*
