@@ -8,8 +8,8 @@
 ## Session Variables
 
 ```yaml
-current_day: 16
-current_phase: 2        # 0=Init · 0b=Bootstrap · 1=Architect · 2=Dev+QA · 4=DevOps · 4b=Review · 5=State Update
+current_day: 17
+current_phase: 0        # 0=Init · 0b=Bootstrap · 1=Architect · 2=Dev+QA · 4=DevOps · 4b=Review · 5=State Update
 branch_base: develop
 feature_branch: ~       # resolved in Phase 1 from {{SLUG}}
 phase_plan: "03"        # platform_roadmap.md phase reference
@@ -20,8 +20,9 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* **M3.5 complete** — Graceful shutdown implemented across all 3 services: tracked in-flight requests via `RequestTracker` singleton, drain middleware rejects new requests during shutdown (503 RFC 7807), `GracefulShutdownHostedService` triggers drain on SIGTERM, configurable timeout via `GracefulShutdown__TimeoutSeconds` (default 30s). Health endpoints always bypassed. 97/97 unit tests passing (13 new). PR #19 squash-merged into `develop`.
-* Next: **M3.6** — Ops Runbooks: documented recovery playbook for each failure scenario in `ops/runbooks/`.
+* **M3.6 complete** — Ops Runbooks: 4 scenario-specific recovery playbooks created (`db-failover.md`, `service-crash-recovery.md`, `dlq-drain.md`, `horizontal-scaling.md`) plus central index (`day_16_runbook.md`) referencing all existing day runbooks. Each playbook includes detection, triage, step-by-step recovery, post-mortem checklist. Chaos-test CI flakiness documented per carry-forward. 97/97 unit tests passing. PR #20 squash-merged into `develop`.
+* **Phase 03 complete** — All 8 components for High Availability & Chaos Testing are ✅. Next: road to Phase 04 (observability).
+* Carry-forward maintained: chaos-test CI flakiness (`test_db_downtime`) — documented in runbooks with mitigation approaches, not yet applied to `scripts/chaos/test_db_downtime.sh`.
 
 ---
 
@@ -184,6 +185,21 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 
 ---
 
+## Phase Outputs — Day 16
+> Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
+
+| Phase | Artifact | Status |
+|---|---|---|
+| 0 | State initialized, variables resolved → M3.6 Ops Runbooks | ✅ |
+| 0b | *Skipped* (repo has prior commits) | ✅ |
+| 1 | `docs/architecture/day_16_spec.md` | ✅ |
+| 2 | Commit log — 5/5 units committed, zero halted — feature branch on `origin` | ✅ |
+| 4 | `ops/runbooks/` — 4 scenario playbooks + central index | ✅ |
+| 4b | `docs/architecture/day_16_review_report.md` + PR #20 merged to `develop` | ✅ |
+| 5 | State update, roadmap update, changelog, validation | ✅ |
+
+---
+
 ## Incomplete Tasks
 > Tasks started this day but halted (lint/test failure, spec ambiguity, reviewer FAIL routing).  
 > **Must be empty before Day N+1 can begin.** Populated by Reviewer FAIL verdict or commit-gate halt.
@@ -229,6 +245,7 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 | 13 | Chaos test suite (M3.3) | xUnit chaos tests (DB downtime, service crash, network partition), bash scripts, chaos-test CI job, runbook, 3 new test files | PR #16 merged to `develop` | ✅ |
 | 14 | Rate limiting & load shedding (M3.4) | RateLimitingMiddleware (429 + Retry-After), LoadSheddingMiddleware (503 RFC 7807), 8 new tests (84 total), runbook | PR #17 squash-merged to `develop` | ✅ |
 | 15 | Graceful shutdown (M3.5) | `Kendo.Shared.GracefulShutdown` module (RequestTracker, GracefulShutdownMiddleware, GracefulShutdownHostedService), wired into all 3 services, 13 new tests (97 total), runbook | PR #19 squash-merged to `develop` | ✅ |
+| 16 | Ops runbooks (M3.6) | 4 scenario playbooks (db-failover, service-crash, dlq-drain, horizontal-scaling) + central index; chaos-test CI flakiness documented; 0 code changes; 97/97 tests passing | PR #20 squash-merged to `develop` | ✅ |
 
 ---
 
@@ -258,8 +275,9 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 * **Docker Compose:** All 6 services with health checks; multi-replica (3 each) scaling for chaos testing
 * **Chaos Test Suite:** 3 xUnit tests (`Category=Chaos`) with Docker CLI integration. 3 bash scripts in `scripts/chaos/`. CI job `chaos-test` runs after `docker-compose`, invokes `run_all.sh` on multi-replica stack, uploads structured results artifact
 * **Tests:** 97/97 unit tests passing (84 existing + 13 new graceful shutdown)
-* **Branches:** `develop` (PR #19 squash-merged — Day 15) — on `origin`
-* **Pipelines:** CI pipeline active: build-and-test -> docker-compose -> chaos-test (new)
+* **Runbooks:** 4 scenario playbooks (`db-failover.md`, `service-crash-recovery.md`, `dlq-drain.md`, `horizontal-scaling.md`) + central index (`day_16_runbook.md`) covering all Phase 03 failure scenarios
+* **Branches:** `develop` (PR #20 squash-merged — Day 16) — on `origin`
+* **Pipelines:** CI pipeline active: build-and-test -> docker-compose -> chaos-test (known flakiness: test_db_downtime intermittent 000000)
 
 * **Docker Compose:** All 6 services with health checks; PostgreSQL (5s interval), app services (10s interval), Redis (5s interval), NGINX (10s interval, wget self-health); `depends_on` postgres healthy → userservice
 * **Database:** PostgreSQL 16 + pgvector (`pgvector/pgvector:pg16`), `kendo_users` DB, `vector` extension enabled via EF Core migration
