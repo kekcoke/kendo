@@ -2,7 +2,6 @@ using Kendo.Shared.Messaging;
 using Kendo.UserService.Data;
 using Kendo.UserService.Models;
 using Microsoft.AspNetCore.Mvc;
-using Rebus.Bus;
 
 namespace Kendo.UserService.Controllers;
 
@@ -11,19 +10,21 @@ namespace Kendo.UserService.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly UserRepository _repository;
-    private readonly IBus _bus;
+    private readonly OutboxRepository _outboxRepository;
     private readonly ILogger<UsersController> _logger;
 
-    public UsersController(UserRepository repository, IBus bus, ILogger<UsersController> logger)
+    public UsersController(UserRepository repository, OutboxRepository outboxRepository, ILogger<UsersController> logger)
     {
         _repository = repository;
-        _bus = bus;
+        _outboxRepository = outboxRepository;
         _logger = logger;
     }
 
     /// <summary>
     /// Creates a new user registration request asynchronously.
     /// Returns 202 Accepted with a Location header pointing to the status polling endpoint.
+    /// The domain event is written to the transactional outbox and published atomically
+    /// by the OutboxRelayService background relay.
     /// </summary>
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateUserRequest request, CancellationToken ct)
@@ -33,27 +34,15 @@ public class UsersController : ControllerBase
 
         var user = await _repository.CreateAsync(request.Email, request.DisplayName, ct);
 
-        // Publish domain event via Rebus (fire-and-forget; M2.3 will consume)
-        if (_bus is not null)
+        // Write domain event to outbox table (same transaction as user creation)
+        var userCreatedEvent = new UserCreatedEvent
         {
-            try
-            {
-                await _bus.Send(new UserCreatedEvent
-                {
-                    UserId = user.Id,
-                    Email = user.Email,
-                    DisplayName = user.DisplayName
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to publish UserCreatedEvent for user {UserId}. Event will be retried or lost without outbox (M2.5 deferred).", user.Id);
-            }
-        }
-        else
-        {
-            _logger.LogWarning("IBus is null (ASB not configured). UserCreatedEvent not published for user {UserId}.", user.Id);
-        }
+            UserId = user.Id,
+            Email = user.Email,
+            DisplayName = user.DisplayName
+        };
+
+        await _outboxRepository.AddAsync(userCreatedEvent, ct);
 
         var response = new UserStatusResponse
         {

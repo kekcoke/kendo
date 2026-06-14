@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using Rebus.Bus;
 
 namespace Kendo.Tests.UserService;
 
@@ -26,7 +25,7 @@ public class UsersControllerTests
             => action(ct);
     }
 
-    private static (UsersController controller, Mock<IBus> busMock) CreateSut(string dbName)
+    private static (UsersController controller, AppDbContext db) CreateSut(string dbName)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(dbName)
@@ -34,16 +33,16 @@ public class UsersControllerTests
         var db = new AppDbContext(options);
         var resilientDb = new ResilientAppDbContext(db, new PassThroughResiliencePipeline());
         var repo = new UserRepository(db, resilientDb);
-        var busMock = new Mock<IBus>();
+        var outboxRepo = new OutboxRepository(db, resilientDb);
         var logger = NullLogger<UsersController>.Instance;
-        var controller = new UsersController(repo, busMock.Object, logger);
+        var controller = new UsersController(repo, outboxRepo, logger);
 
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         };
 
-        return (controller, busMock);
+        return (controller, db);
     }
 
     [Fact]
@@ -66,13 +65,19 @@ public class UsersControllerTests
     }
 
     [Fact]
-    public async Task Post_PublishesUserCreatedEvent()
+    public async Task Post_WritesToOutbox()
     {
-        var (controller, busMock) = CreateSut(nameof(Post_PublishesUserCreatedEvent));
+        var (controller, db) = CreateSut(nameof(Post_WritesToOutbox));
 
-        await controller.Create(new CreateUserRequest { Email = "event@example.com", DisplayName = "Event Test" }, CancellationToken.None);
+        await controller.Create(new CreateUserRequest { Email = "outbox@example.com", DisplayName = "Outbox Test" }, CancellationToken.None);
 
-        busMock.Verify(b => b.Send(It.Is<UserCreatedEvent>(e => e.Email == "event@example.com"), It.IsAny<IDictionary<string, string>>()), Times.Once);
+        // Verify an outbox record was created with the correct message type and payload
+        var outboxMessages = await db.OutboxMessages.ToListAsync();
+        var message = Assert.Single(outboxMessages);
+        Assert.Equal("Kendo.Shared.Messaging.UserCreatedEvent, Kendo.Shared", message.MessageType);
+        Assert.Contains("outbox@example.com", message.Payload);
+        Assert.Null(message.ProcessedAt);
+        Assert.Equal(0, message.RetryCount);
     }
 
     [Fact]
@@ -115,26 +120,5 @@ public class UsersControllerTests
         Assert.Equal(404, notFoundResult.StatusCode);
         var problem = Assert.IsType<ProblemDetails>(notFoundResult.Value);
         Assert.Equal(404, problem.Status);
-    }
-
-    [Fact]
-    public async Task Post_Returns202_WhenBusIsNull()
-    {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(nameof(Post_Returns202_WhenBusIsNull))
-            .Options;
-        var db = new AppDbContext(options);
-        var resilientDb = new ResilientAppDbContext(db, new PassThroughResiliencePipeline());
-        var repo = new UserRepository(db, resilientDb);
-        var logger = NullLogger<UsersController>.Instance;
-        var controller = new UsersController(repo, null!, logger);
-        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
-
-        var result = await controller.Create(new CreateUserRequest { Email = "nobus@example.com", DisplayName = "No Bus" }, CancellationToken.None);
-
-        var acceptedResult = Assert.IsType<AcceptedAtActionResult>(result);
-        Assert.Equal(202, acceptedResult.StatusCode);
-        var response = Assert.IsType<UserStatusResponse>(acceptedResult.Value);
-        Assert.Equal("pending", response.Status);
     }
 }
