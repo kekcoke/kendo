@@ -3,6 +3,7 @@ using Kendo.Shared.Http;
 using Kendo.Shared.Messaging;
 using Kendo.Shared.Observability;
 using Kendo.Shared.Resilience;
+using Kendo.UserService.Data;
 using Kendo.Worker;
 using Kendo.Worker.Data;
 using Microsoft.AspNetCore.Mvc;
@@ -26,6 +27,9 @@ builder.Services.AddKendoErrorHandling();
 builder.Services.AddKendoRebus(builder.Configuration, "consumer");
 
 builder.Services.AddDbContext<WorkerDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<WorkerResilientDbContext>();
