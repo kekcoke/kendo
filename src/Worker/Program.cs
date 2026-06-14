@@ -15,6 +15,11 @@ using Rebus.ServiceProvider;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers()
+    .ConfigureApplicationPartManager(apm =>
+    {
+        apm.ApplicationParts.Clear();
+        apm.ApplicationParts.Add(new Microsoft.AspNetCore.Mvc.ApplicationParts.AssemblyPart(typeof(Program).Assembly));
+    })
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
