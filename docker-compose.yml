@@ -8,6 +8,7 @@ services:
     environment:
       - ASPNETCORE_URLS=http://+:5000
       - DOTNET_ENVIRONMENT=Development
+      - Redis__ConnectionString=redis:6379
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health/live"]
       interval: 10s
@@ -25,6 +26,7 @@ services:
       - ASPNETCORE_URLS=http://+:5001
       - DOTNET_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=kendo_users;Username=kendo;Password=kendo_dev
+      - Redis__ConnectionString=redis:6379
     depends_on:
       postgres:
         condition: service_healthy
@@ -45,6 +47,7 @@ services:
       - ASPNETCORE_URLS=http://+:5002
       - DOTNET_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=kendo_users;Username=kendo;Password=kendo_dev
+      - Redis__ConnectionString=redis:6379
     depends_on:
       postgres:
         condition: service_healthy
@@ -91,6 +94,17 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 
 volumes:
   pgdata:
