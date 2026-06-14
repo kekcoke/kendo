@@ -8,7 +8,7 @@
 ## Session Variables
 
 ```yaml
-current_day: 11
+current_day: 12
 current_phase: 0        # 0=Init · 0b=Bootstrap · 1=Architect · 2=Dev+QA · 4=DevOps · 4b=Review · 5=State Update
 branch_base: develop
 feature_branch: ~       # resolved in Phase 1 from {{SLUG}}
@@ -20,9 +20,9 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* M2.6 — Async observability: `OutboxMessage.TraceContext` column capturing ambient `Activity.Current?.Id` at write time; `OutboxRelayService` passes `traceparent` as Rebus message header; `UserCreatedEventHandler.StartTraceActivity()` extracts header and creates child `Activity` linked to producer trace; EF migration `AddTraceContext`.
-* 94/94 unit tests passing (77 existing + 17 new traceparent tests); PR #12 squash-merged into `develop`.
-* Phase 02 is complete — all milestones M2.1–M2.6 delivered. Next: Phase 03 — High Availability & Chaos Testing.
+* Phase 02 complete (Milestones M2.1–M2.6 delivered). PR #12 squash-merged into `develop`.
+* 94/94 unit tests passing. Next scope: **Phase 03 — High Availability & Chaos Testing**.
+* Day 12 opens M3.1 — Load balancer: reverse proxy routing traffic across ≥ 2 container replicas per service.
 
 ---
 
