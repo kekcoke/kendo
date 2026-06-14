@@ -7,6 +7,7 @@ using Kendo.UserService.Data;
 using Kendo.Worker;
 using Kendo.Worker.Data;
 using Kendo.Worker.Handlers;
+using Kendo.Worker.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Rebus.Handlers;
@@ -48,7 +49,9 @@ builder.Services.AddScoped<WorkerResilientDbContext>();
 builder.Services.AddHttpClient("default")
     .AddHttpMessageHandler<ResilienceDelegatingHandler>();
 
+builder.Services.AddKendoRebusDlqConsumer(builder.Configuration);
 builder.Services.AddHostedService<WorkerBackgroundService>();
+builder.Services.AddHostedService<DlqDepthMonitor>();
 
 var app = builder.Build();
 
