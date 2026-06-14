@@ -1,3 +1,4 @@
+using Kendo.Shared.Caching;
 using Kendo.Shared.ErrorHandling;
 using Kendo.Shared.Http;
 using Kendo.Shared.Messaging;
@@ -19,6 +20,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 
 builder.Services.AddKendoResilience(builder.Configuration);
 builder.Services.AddKendoObservability(builder.Configuration, "kendo-gateway");
+builder.Services.AddKendoDistributedCache(builder.Configuration);
 builder.Services.AddKendoErrorHandling();
 builder.Services.AddKendoRebus(builder.Configuration, "producer");
 
@@ -28,6 +30,7 @@ builder.Services.AddHttpClient("default")
 var app = builder.Build();
 
 app.UseKendoErrorHandling();
+app.UseKendoReplicaIdentity();
 
 app.MapControllers();
 

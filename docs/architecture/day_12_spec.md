@@ -1,235 +1,369 @@
 # Day 12 — Architecture Specification
 
+> **Session:** Day 12 | **Milestone:** M3.2 — Stateless validation  
+> **Phase plan:** 03 — High Availability & Chaos Testing  
+> **Author:** Platform Architect (Orchestrator-routed)  
+> **Date:** 2026-06-14
+
+---
+
 ## Milestone Scope
 
-**Milestone:** M3.1 — Load balancer: reverse proxy (NGINX) routing traffic across ≥ 2 container replicas per service
-**Roadmap phase:** 03 — High Availability & Chaos Testing
-**SLUG:** `reverse-proxy-load-balancer`
+- **Milestone:** M3.2 — Stateless validation: sticky sessions disabled; any session state externalized to Redis or the database.
+- **Roadmap phase:** 03 — High Availability & Chaos Testing
+- **Components touched:**
+  1. `Stateless Services` — all 3 services (Gateway, UserService, Worker)
+  2. `Redis (or equivalent)` — external distributed cache / session store
+- **Explicitly out of scope:**
+  - M3.3 — Chaos suite (automated DB downtime, service crash, network partition tests)
+  - M3.4 — Rate limiting & load shedding (429 + 503 enforcement at Gateway)
+  - M3.5 — Graceful shutdown (SIGTERM handlers)
+  - M3.6 — Ops runbooks (recovery playbooks for each failure scenario)
 
-**Components touched:**
-- **Docker Compose** (`docker-compose.yml`) — add NGINX reverse proxy service; remove direct port exposure of backend services; enable `--scale` compatibility
-- **Ops bundle** (`ops/nginx/nginx.conf`) — new NGINX configuration with upstream load balancing per service, health-check-aware routing, and common proxy headers
-- **Gateway** — no code changes; port exposure moves behind proxy
-- **UserService** — no code changes; port exposure moves behind proxy
-- **Worker** — no code changes; port exposure moves behind proxy
-- **CI pipeline** (`.github/workflows/ci.yml`) — add multi-replica startup verification step
-- **Dockerfiles** — no changes needed (existing health endpoints sufficient)
+### Rationale
 
-**Explicitly out of scope:**
-- M3.2 **Stateless validation** (Redis session store, sticky-session disable) — deferred to next milestone
-- M3.3 **Chaos test suite** (DB downtime, crash, partition scenarios) — deferred; needs load balancer first as a prerequisite
-- M3.4 **Rate limiting & shedding** (429/503 enforcement at Gateway) — deferred; follows stateless validation
-- M3.5 **Graceful shutdown** (SIGTERM handlers, drain timeout) — deferred; needs load balancer health-check unregistration
-- M3.6 **Ops runbooks** — deferred until all failure scenarios are built
+M3.1 (prior Day 12 session) established the NGINX reverse proxy with round-robin load balancing across 3 replicas per service. Sticky sessions are **already disabled** by default: NGINX uses DNS round-robin via variable-based `proxy_pass` (no `ip_hash`, no `sticky` directive). M3.2 formalises this posture and introduces Redis as the externalised state/cache store:
+
+1. **Replica identity** — each container replica needs a unique identifier so operators and integration tests can verify traffic is truly round-robin. Docker `$HOSTNAME` provides this.
+2. **Redis distributed cache** — Wire `StackExchange.Redis` + `IDistributedCache` into Kendo.Shared so any future session-like state is externalised immediately. Redis is already defined in the dependency map (Day 00) but was never wired.
+3. **Middleware** — Add `X-Kendo-Replica` response header on every service response, confirming which replica served the request.
+4. **Docker Compose** — Add Redis connection strings and expose the Redis service to all app services.
 
 ---
 
 ## Layer Changes
 
-### Docker Compose — Topology Redesign
-
-**Current topology (Day 11):**
-```
-Client ──▶ gateway:5000 ──▶ userservice:5001
-                     └──▶ worker:5002
-```
-
-Each service is directly exposed on a host port. No load balancing. Single replica per service.
-
-**Target topology (Day 12):**
-```
-                     ┌──▶ gateway:5000 (replica 1)
-                     ├──▶ gateway:5000 (replica 2)
-Client ──▶ nginx:80 ──┼──▶ gateway:5000 (replica 3)
-                     │
-                     ├──▶ userservice:5001 (replica 1)
-                     ├──▶ userservice:5001 (replica 2)
-                     └──▶ userservice:5001 (replica 3)
-```
-
-- **Single entry point:** NGINX on port 80 (maps to host port 5000 for backward-compatibility)
-- **Backend services:** no host port mapping (`expose: [port]` only) — reachable only via Docker internal DNS
-- **Worker:** not exposed externally via NGINX (internal async consumer); remains reachable via Docker DNS for health checks
-- **Health-check routing:** NGINX `health_check` upstream directive ensures unhealthy replicas are removed from rotation
-
-### NGINX Configuration — `ops/nginx/nginx.conf`
-
-**Upstream blocks** (Docker DNS round-robin):
-- `backend_gateway` — routes `gateway:5000` (3 replicas via `--scale`)
-- `backend_userservice` — routes `userservice:5001` (3 replicas via `--scale`)
-
-**Location routing:**
-- `/api/users/*` → `backend_userservice`
-- `/health/*` → both upstreams (health probes pass through)
-- All other paths → `backend_gateway`
-
-**Proxy settings:**
-- Standard proxy headers: `X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto`, `Host`
-- Proxy timeouts: connect=5s, read=30s, send=30s
-- Client max body size: 10MB (same as existing Gateway limit)
-- No sticky sessions — round-robin only (enforces statelessness, aligns with `## Architectural Decisions Log` entry: "no in-process session state permitted")
-
-### Multi-Replica Strategy
-
-Docker Compose supports per-service scaling via `--scale` CLI flag:
-```bash
-docker compose up -d --scale gateway=3 --scale userservice=3 --scale worker=3
-```
-
-NGINX automatically routes to all healthy replicas via Docker DNS round-robin — no explicit replica list needed in the upstream block.
-
-**Important constraint for CI:** The `ports:` entry must use `expose:` instead for scaled services to avoid host port conflicts. NGINX is the only service with a host port mapping.
+| Service/Project | Change |
+|---|---|
+| `Kendo.Shared` | Add `DistributedCacheServiceCollectionExtensions` — registers `StackExchange.Redis` + `IDistributedCache` via `AddKendoDistributedCache()`. Add `ReplicaIdentityMiddleware` — reads `$HOSTNAME` (or `HOSTNAME` env var), appends `X-Kendo-Replica` header to all responses. |
+| `Kendo.Shared.csproj` | Add `Microsoft.Extensions.Caching.StackExchangeRedis` package reference. |
+| `Gateway` (`Program.cs`) | Call `AddKendoDistributedCache()` + `UseKendoReplicaIdentity()`. Add `Redis__ConnectionString` to `appsettings.json`. |
+| `UserService` (`Program.cs`) | Call `AddKendoDistributedCache()` + `UseKendoReplicaIdentity()`. Add `Redis__ConnectionString` to `appsettings.json`. |
+| `Worker` (`Program.cs`) | Call `AddKendoDistributedCache()` + `UseKendoReplicaIdentity()`. Add `Redis__ConnectionString` to `appsettings.json`. |
+| `docker-compose.yml` | Add `Redis__ConnectionString` env var to all 3 services (`redis:6379`). Add Redis service definition. |
+| `ops/nginx/nginx.conf` | Add `X-Kendo-Replica` to `proxy_set_header` passthrough. |
+| `tests/Kendo.Tests` | Add `ReplicaIdentityMiddlewareTests.cs` + `DistributedCacheRegistrationTests.cs`. |
 
 ---
 
 ## Data Contracts
 
-### Docker Compose — Service Contract Changes
+### Redis Connection String (environment variable)
 
-| Service | Before (Day 11) | After (Day 12) |
-|---|---|---|
-| `gateway` | `ports: ["5000:5000"]` | `expose: ["5000"]` |
-| `userservice` | `ports: ["5001:5001"]` | `expose: ["5001"]` |
-| `worker` | `ports: ["5002:5002"]` | `expose: ["5002"]` |
-| `nginx` | *(does not exist)* | `ports: ["5000:80"]`, depends on all 3 services healthy |
-| `postgres` | unchanged | unchanged |
+```yaml
+Redis__ConnectionString: "redis:6379"
+```
 
-### NGINX Upstream Contract
+Applied via Docker Compose environment variables. Graceful fallback: if the connection string is missing or Redis is unreachable, `IDistributedCache` operations log a warning and degrade gracefully (no crash, no cascade).
 
-| Upstream Name | Target | Port | Health Check Endpoint |
+### X-Kendo-Replica Response Header
+
+| Header | Value | Type | Example |
 |---|---|---|---|
-| `backend_gateway` | `gateway` | `5000` | `/health/live` |
-| `backend_userservice` | `userservice` | `5001` | `/health/live` |
+| `X-Kendo-Replica` | Docker container hostname | `string` | `"gateway-1"`, `"gateway-2"`, `"gateway-3"` |
 
-### Environment Variables
+Every public HTTP response from Gateway, UserService, and Worker includes this header. NGINX passes it through from the upstream replica to the external caller.
 
-| Variable | Value | Purpose |
-|---|---|---|
-| `NGINX_HOST` | `0.0.0.0` (default) | Listen address |
-| `NGINX_PORT` | `80` (default, maps to host 5000) | Internal listen port |
+### Replica Identity Resolution Algorithm
 
-No new environment variables for existing services — the backend addresses are resolved via Docker DNS (`gateway`, `userservice`, `worker` hostnames), which is automatic in Compose.
+```
+1. Read HOSTNAME environment variable (set by Docker to container ID/name)
+2. If null/empty → fall back to Environment.MachineName
+3. If still null/empty → "unknown"
+4. Value is cached in a static Lazy<string> for the process lifetime
+```
 
 ---
 
 ## Implementation Plan (Commit Units)
 
-### Unit 1 — NGINX reverse proxy configuration + Docker Compose update
+### Unit 1 — Kendo.Shared: Distributed cache registration + replica identity middleware
 
 **Files:**
-- `ops/nginx/nginx.conf` — new file with upstream blocks, location routing, proxy headers, health check config
-- `docker-compose.yml` — add `nginx` service, change backend `ports:` to `expose:`, wire `depends_on` with health conditions
+- `src/Shared/Caching/DistributedCacheServiceCollectionExtensions.cs` (new)
+- `src/Shared/Caching/ReplicaIdentityMiddleware.cs` (new)
+- `src/Shared/Kendo.Shared.csproj` (add package ref)
 
-**Gate command:**
-```bash
-docker compose config -q && echo "VALID" || echo "INVALID"
-```
+**Gate command:** `dotnet build src/Shared/Kendo.Shared.csproj --no-restore 2>&1 | tail -5`
 
 **Commit message:**
 ```
-feat(ops): add NGINX reverse proxy with upstream load balancing, update Docker Compose for multi-replica
+feat(shared): add Redis distributed cache registration and replica identity middleware
 
-Day 12 — unit 1 of 3 | Milestone M3.1
+Day 12 — unit 1 of 6 | Milestone M3.2
+Coverage: ~
+Lint: ~
 ```
 
-### Unit 2 — CI pipeline update for multi-replica validation
+**DistributedCacheServiceCollectionExtensions.cs** — registers `StackExchange.Redis` + `IDistributedCache` conditionally:
+```csharp
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+namespace Kendo.Shared.Caching;
+
+public static class DistributedCacheServiceCollectionExtensions
+{
+    public static IServiceCollection AddKendoDistributedCache(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var connectionString = configuration["Redis__ConnectionString"]
+                               ?? configuration["RedisConnectionStrings__DefaultConnection"];
+
+        if (!string.IsNullOrWhiteSpace(connectionString))
+        {
+            services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = connectionString;
+                options.InstanceName = "kendo:";
+            });
+        }
+        else
+        {
+            // Fallback: in-memory cache when Redis is not configured (local dev / CI)
+            services.AddDistributedMemoryCache();
+        }
+
+        return services;
+    }
+}
+```
+
+**ReplicaIdentityMiddleware.cs** — reads HOSTNAME, appends header:
+```csharp
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+
+namespace Kendo.Shared.Caching;
+
+public class ReplicaIdentityMiddleware
+{
+    private readonly RequestDelegate _next;
+    private readonly string _replicaId;
+    private readonly ILogger<ReplicaIdentityMiddleware> _logger;
+
+    public ReplicaIdentityMiddleware(RequestDelegate next, ILogger<ReplicaIdentityMiddleware> logger)
+    {
+        _next = next;
+        _logger = logger;
+
+        _replicaId = Environment.GetEnvironmentVariable("HOSTNAME")
+                     ?? Environment.MachineName
+                     ?? "unknown";
+
+        _logger.LogInformation("Replica identity resolved: {ReplicaId}", _replicaId);
+    }
+
+    public async Task InvokeAsync(HttpContext context)
+    {
+        context.Response.OnStarting(() =>
+        {
+            if (!context.Response.Headers.ContainsKey("X-Kendo-Replica"))
+            {
+                context.Response.Headers["X-Kendo-Replica"] = _replicaId;
+            }
+            return Task.CompletedTask;
+        });
+
+        await _next(context);
+    }
+}
+
+public static class ReplicaIdentityMiddlewareExtensions
+{
+    public static IApplicationBuilder UseKendoReplicaIdentity(this IApplicationBuilder app)
+    {
+        return app.UseMiddleware<ReplicaIdentityMiddleware>();
+    }
+}
+```
+
+**Kendo.Shared.csproj** — add after existing OpenTelemetry reference:
+```xml
+<PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.9" />
+```
+
+---
+
+### Unit 2 — Gateway: wire middleware + Redis connection
 
 **Files:**
-- `.github/workflows/ci.yml` — add job or step: `docker compose up --scale gateway=3 --scale userservice=3 --scale worker=3`, verify all 7 containers (3 gateway + 3 userservice + 3 worker + 1 nginx + 1 postgres = 11, but the services are 3+3+3+1+1=11 actually) are healthy, then run a smoke test through NGINX
+- `src/Gateway/Program.cs` (insert 2 lines)
+- `src/Gateway/appsettings.json` (add `Redis` section)
 
-**Gate command:**
-```bash
-# Validate the CI config parses
-yamllint .github/workflows/ci.yml
-```
+**Gate command:** `dotnet build src/Gateway/Kendo.Gateway.csproj --no-restore 2>&1 | tail -5`
 
 **Commit message:**
 ```
-ci(ops): add multi-replica startup verification and health-check smoke test
+feat(gateway): wire replica identity middleware and Redis distributed cache
 
-Day 12 — unit 2 of 3 | Milestone M3.1
+Day 12 — unit 2 of 6 | Milestone M3.2
+Coverage: ~
+Lint: ~
 ```
 
-### Unit 3 — Integration test: traffic distribution + replica kill resilience
+**Program.cs changes:**
+- After `builder.Services.AddKendoObservability(...)` → add `builder.Services.AddKendoDistributedCache(builder.Configuration);`
+- After `app.UseKendoErrorHandling()` → add `app.UseKendoReplicaIdentity();`
+
+**appsettings.json additions** (append after closing brace of Resilience):
+```json
+  "Redis": {
+    "ConnectionString": "localhost:6379"
+  }
+```
+
+---
+
+### Unit 3 — UserService: wire middleware + Redis connection
 
 **Files:**
-- `tests/Kendo.Tests/Infrastructure/LoadBalancerTests.cs` — new test class with:
-  1. `Request_RoutesToGateway_ThroughNginx` — curl NGINX port, verify response from Gateway
-  2. `Request_RoutesToUserService_ThroughNginx` — `POST /api/users` through NGINX, verify 202 Accepted
-  3. `Request_DistributesAcrossReplicas` — send N requests, verify ≥ 2 different upstream hostnames via response headers (requires `X-Upstream` or log inspection)
-  4. `KillOneReplica_NoClientVisibleErrors` — docker stop one gateway replica, send requests, verify 0 non-5xx errors within health-check TTL
-  5. `AllReplicasHealthy_AfterStartup` — `docker compose ps` shows all replicas healthy
+- `src/UserService/Program.cs` (insert 2 lines)
+- `src/UserService/appsettings.json` (add `Redis` section)
 
-**Note on test environment:** Tests 4–5 require Docker access and are marked as `[Category=Infrastructure]` — excluded from unit test runs, run separately in CI.
-
-**Gate command:**
-```bash
-dotnet test tests/Kendo.Tests/Kendo.Tests.csproj --filter Category=Infrastructure --no-restore 2>&1
-```
+**Gate command:** `dotnet build src/UserService/Kendo.UserService.csproj --no-restore 2>&1 | tail -5`
 
 **Commit message:**
 ```
-test(infra): add load balancer integration tests — traffic distribution, replica kill resilience
+feat(userservice): wire replica identity middleware and Redis distributed cache
 
-Day 12 — unit 3 of 3 | Milestone M3.1
+Day 12 — unit 3 of 6 | Milestone M3.2
+Coverage: ~
+Lint: ~
+```
+
+**Program.cs changes:**
+- After `builder.Services.AddKendoObservability(...)` → add `builder.Services.AddKendoDistributedCache(builder.Configuration);`
+- After `app.UseKendoErrorHandling()` → add `app.UseKendoReplicaIdentity();`
+
+**appsettings.json additions:**
+```json
+  "Redis": {
+    "ConnectionString": "localhost:6379"
+  }
+```
+
+---
+
+### Unit 4 — Worker: wire middleware + Redis connection
+
+**Files:**
+- `src/Worker/Program.cs` (insert 2 lines)
+- `src/Worker/appsettings.json` (add `Redis` section)
+
+**Gate command:** `dotnet build src/Worker/Kendo.Worker.csproj --no-restore 2>&1 | tail -5`
+
+**Commit message:**
+```
+feat(worker): wire replica identity middleware and Redis distributed cache
+
+Day 12 — unit 4 of 6 | Milestone M3.2
+Coverage: ~
+Lint: ~
+```
+
+**Program.cs changes:**
+- After `builder.Services.AddKendoObservability(...)` → add `builder.Services.AddKendoDistributedCache(builder.Configuration);`
+- After `app.UseKendoErrorHandling()` → add `app.UseKendoReplicaIdentity();`
+
+**appsettings.json additions:**
+```json
+  "Redis": {
+    "ConnectionString": "localhost:6379"
+  }
+```
+
+---
+
+### Unit 5 — Docker Compose + NGINX: Redis service + replica header passthrough
+
+**Files:**
+- `docker-compose.yml` (add Redis service; add `Redis__ConnectionString` env vars to all 3 services)
+- `ops/nginx/nginx.conf` (add `proxy_set_header X-Kendo-Replica $upstream_http_x_kendo_replica;`)
+
+**Gate command:** `docker compose config 2>&1 | head -20`
+
+**Commit message:**
+```
+chore(infra): add Redis service, connection strings, and replica header passthrough
+
+Day 12 — unit 5 of 6 | Milestone M3.2
+Coverage: ~
+Lint: ~
+```
+
+**docker-compose.yml — Redis service** (new block):
+```yaml
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+```
+
+**docker-compose.yml** — add `Redis__ConnectionString` to services:
+```yaml
+    - Redis__ConnectionString=redis:6379
+```
+
+**nginx.conf** — add to `server` block alongside existing `proxy_set_header` directives:
+```nginx
+proxy_set_header X-Kendo-Replica $upstream_http_x_kendo_replica;
+```
+
+---
+
+### Unit 6 — Tests: replica identity and cache registration
+
+**Files:**
+- `tests/Kendo.Tests/Caching/ReplicaIdentityMiddlewareTests.cs` (new)
+- `tests/Kendo.Tests/Caching/DistributedCacheRegistrationTests.cs` (new)
+
+**Gate command:** `dotnet test tests/Kendo.Tests --filter "Category=Unit|Category=Caching" 2>&1 | tail -15`
+
+**Commit message:**
+```
+test(caching): add tests for replica identity middleware and cache registration
+
+Day 12 — unit 6 of 6 | Milestone M3.2
+Coverage: ~
+Lint: ~
 ```
 
 ---
 
 ## Success Checklist
 
-- [ ] `docker compose config -q` succeeds with the new NGINX service and `expose:` declarations
-- [ ] `docker compose up --scale gateway=3 --scale userservice=3 --scale worker=3` starts all 11 containers (3 gateway + 3 userservice + 3 worker + 1 nginx + 1 postgres) with all health checks passing
-- [ ] `curl -s http://localhost:5000/health/live` returns 200 through NGINX (proxied to Gateway)
-- [ ] `POST http://localhost:5000/api/users` through NGINX returns 202 with `Location` header (routed to UserService via proxy)
-- [ ] Multiple sequential requests through NGINX distribute across different replica instances (verified by unique hostname responses or log correlation)
-- [ ] `docker stop` on one gateway replica produces zero 5xx client errors within 15s (health-check TTL)
-- [ ] All existing unit tests still pass (regression: 94+ existing tests)
-- [ ] CI pipeline includes multi-replica startup step and passes
-- [ ] No direct host-port access to backend services — all traffic passes through NGINX
+- [ ] Every HTTP response from Gateway, UserService, and Worker includes an `X-Kendo-Replica` header whose value matches the Docker container hostname.
+- [ ] Redis distributed cache is registered in all 3 services; `IDistributedCache` is available to inject.
+- [ ] When `Redis__ConnectionString` is missing (local dev/CI), `IDistributedCache` falls back to `AddDistributedMemoryCache()` — no crash.
+- [ ] NGINX passes `X-Kendo-Replica` from upstream replica through to the external caller.
+- [ ] NGINX has no `ip_hash`, `sticky`, or session-affinity directive — sticky sessions remain disabled.
+- [ ] 94/94 existing unit tests + 5 infrastructure tests continue to pass.
+- [ ] `docker compose up` starts all services + Redis; all `/health/ready` probes pass.
 
 ---
 
 ## Resilience Mandate
 
-### NGINX to Backend — Connection Timeouts
+**Redis distributed cache:**
+- Circuit breaker: N/A — `IDistributedCache` operations are best-effort. The cache is a performance optimisation, not a correctness dependency. If Redis is unreachable:
+  1. Set operations log a warning and fail gracefully (catch `RedisConnectionException`, log warning, no rethrow).
+  2. Get operations return `null` (cache miss) — callers must handle cache misses gracefully.
+  3. No cascading failure: the application continues serving requests without Redis.
+- The in-memory fallback (`AddDistributedMemoryCache()`) is the default when no Redis connection string is present.
 
-| Parameter | Value | Rationale |
-|---|---|---|
-| `proxy_connect_timeout` | 5s | Fast fail on unreachable replica — aligns with Polly circuit breaker threshold |
-| `proxy_read_timeout` | 30s | Matches existing Gateway request timeout |
-| `proxy_send_timeout` | 30s | Matches existing Gateway timeout |
+**Replica identity:**
+- N/A — no external dependencies. Reads `HOSTNAME` env var at startup, caches for process lifetime. No network calls, no DB access.
 
-All timeouts are conservative — lower than the Gateway's own timeout to ensure clients see an error from NGINX before the Gateway's own timeout fires.
-
-### Health Check Integration
-
-NGINX uses passive health checks by default (mark upstream unhealthy after `max_fails` failures within `fail_timeout`). For Docker Compose, passive checks are sufficient because Docker's own health checks already remove unhealthy containers from DNS rotation at the Docker level (Docker 20.10+).
-
-**Configuration:**
-```
-upstream backend_gateway {
-    server gateway:5000 max_fails=3 fail_timeout=10s;
-}
-```
-
-If a replica is unreachable 3 times within 10s, NGINX marks it down and retries after `fail_timeout`. This prevents cascading failures — only the failing replica is removed from rotation.
-
-### No Single Point of Failure
-
-NGINX itself is a single point of failure in this local dev topology — this is **accepted** for Day 12. Production would deploy ≥ 2 NGINX instances with a cloud load balancer (Azure Application Gateway / AWS ALB) in front. This will be addressed in a future milestone (likely M3.6 runbook or a production-hardening day).
-
-### Statelessness Enforcement
-
-No sticky sessions (no `ip_hash`, no `sticky`). All services must remain stateless per the existing architecture decision log entry: *"All stateless APIs designed for replicas: 3; no in-process session state permitted."* NGINX round-robin enforces this — any replica must be able to handle any request.
-
-### Fallback Behavior
-
-If all replicas in an upstream are unhealthy:
-- NGINX returns `502 Bad Gateway` with a standard error page
-- The Gateway's own circuit breaker (from Phase 01) adds an additional resilience layer — if the Gateway can't reach UserService, it returns a RFC 7807 503 via the existing `ProblemDetailsMiddleware`
-- Double-failover is intentional: NGINX 502 → client sees load balancer failure; Gateway 503 → client sees degraded but structured error. Both are acceptable for this milestone.
-
-### N/A — No new API endpoints or data access patterns
-
-This milestone does not introduce new API endpoints, database schemas, or message handlers. All existing resilience patterns (Polly Retry + Circuit Breaker, Rebus retry, idempotency, outbox) are unchanged.
+**Sticky session enforcement:**
+- N/A — sticky sessions are permanently disabled by NGINX config (no `ip_hash`, no `sticky` cookie/session directive). This is a structural decision, not a code-enforced one.

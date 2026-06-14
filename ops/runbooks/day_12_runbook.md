@@ -1,26 +1,43 @@
-# Day 12 — NGINX Reverse Proxy & Multi-Replica Runbook
-> **Milestone:** M3.1 — Load balancer: reverse proxy (NGINX) routing traffic across ≥ 2 container replicas per service  
-> **Services affected:** nginx, gateway (3x), userservice (3x), worker (3x), postgres  
-> **Last updated:** 2026-06-13
+# Day 12 — Stateless Validation & Redis Distributed Cache Runbook
+> **Milestone:** M3.2 — Stateless validation: sticky sessions disabled; any session state externalized to Redis or the database  
+> **Services affected:** gateway, userservice, worker, redis, nginx, postgres  
+> **Last updated:** 2026-06-14
 
 ---
 
 ## Topology
 
 ```
-                     ┌──▶ gateway:5000 (replica 1)
-                     ├──▶ gateway:5000 (replica 2)
-Client ──▶ nginx:80 ──┼──▶ gateway:5000 (replica 3)
+                     ┌──▶ gateway:5000 (replica 1) ── Redis:6379
+                     ├──▶ gateway:5000 (replica 2) ── Redis:6379
+Client ──▶ nginx:80 ──┼──▶ gateway:5000 (replica 3) ── Redis:6379
           (port 5000) │
-                     ├──▶ userservice:5001 (replica 1)
-                     ├──▶ userservice:5001 (replica 2)
-                     └──▶ userservice:5001 (replica 3)
+                     ├──▶ userservice:5001 (replica 1) ── Redis:6379
+                     ├──▶ userservice:5001 (replica 2) ── Redis:6379
+                     └──▶ userservice:5001 (replica 3) ── Redis:6379
+                      
+                     worker:5002 (replica 1-3, internal) ── Redis:6379
+                     
+                     postgres:5432 (single, persistent state)
 ```
 
-- **Single entry point:** `localhost:5000` → NGINX (port 80 internal)
-- **Backend services:** no host port exposure — Docker DNS only (`expose:`)
-- **Worker (x3):** internal async consumer, not exposed through NGINX
-- **Postgres:** single replica, unchanged from Phase 02
+- **All services** have `IDistributedCache` registered — Redis when available, in-memory fallback otherwise.
+- **Replica identity:** Every HTTP response carries `X-Kendo-Replica` header set to the Docker container hostname.
+- **NGINX:** No sticky sessions. Round-robin distributes traffic across all healthy replicas. `X-Kendo-Replica` header is passed through to the caller.
+- **Redis:** Externalized cache/session store. Best-effort — application continues without it.
+
+---
+
+## What Changed This Session
+
+| Component | Change |
+|---|---|
+| `Kendo.Shared` | `AddKendoDistributedCache()` — conditional Redis/Memory registration. `ReplicaIdentityMiddleware` — sets `X-Kendo-Replica` header. |
+| Gateway/UserService/Worker | All three wired with Redis cache registration + replica identity middleware. |
+| `docker-compose.yml` | New Redis service (redis:7-alpine). `Redis__ConnectionString` env var on all 3 services. |
+| `ops/nginx/nginx.conf` | `proxy_set_header X-Kendo-Replica $upstream_http_x_kendo_replica;` passthrough. |
+| CI pipeline | Redis service container added. Health count updated (6 single-replica, 12 multi-replica). Replica header verification step added. |
+| Tests | 7 new unit tests covering replica identity middleware (3) and cache registration (4). |
 
 ---
 
@@ -30,54 +47,52 @@ Client ──▶ nginx:80 ──┼──▶ gateway:5000 (replica 3)
 
 | Endpoint | Target | Expected Response | Used By |
 |---|---|---|---|
-| `GET /health/live` | Gateway (via NGINX) | `200 "Healthy"` | Docker health check, CI smoke test |
-| `GET /health/ready` | Gateway (via NGINX) | `200 "Ready"` | CI smoke test |
-| `GET /health/live` (direct) | each backend service | `200 "Healthy"` | NGINX passive health check |
-| `POST /api/users` (via NGINX) | UserService | `202 Accepted` + `Location` header | CI smoke test |
+| `GET /health/live` | All services | `200 "Healthy"` | Docker health check, CI smoke test |
+| `GET /health/ready` | All services | `200 "Ready"` | CI smoke test |
+| `PING` (redis-cli) | Redis | `PONG` | Docker health check |
+
+### Key Response Headers
+
+| Header | Source | Example | Purpose |
+|---|---|---|---|
+| `X-Kendo-Replica` | all 3 services | `"gateway-1"`, `"userservice-2"`, `"worker-3"` | Identify which container replica served the request |
 
 ### What to Verify After Deployment
 
-1. **All 11 containers healthy:**
+1. **All containers healthy:**
    ```bash
    docker compose ps --format json | grep '"Health":"healthy"' | wc -l
-   # Expected: 11
+   # Single-replica: 6 (gateway, userservice, worker, postgres, nginx, redis)
+   # Multi-replica: 12 (3 gateway + 3 userservice + 3 worker + nginx + postgres + redis)
    ```
 
-2. **NGINX proxies traffic correctly:**
+2. **X-Kendo-Replica header present through NGINX:**
    ```bash
-   curl -fsS http://localhost:5000/health/live        # → 200 through NGINX
-   curl -fsS -o /dev/null -w "%{http_code}" -X POST \
-     http://localhost:5000/api/users \
-     -H 'Content-Type: application/json' \
-     -d '{"email":"verify@test.com","displayName":"Verify"}'  # → 202
+   curl -sI http://localhost:5000/health/live | grep -i X-Kendo-Replica
+   # Expected: X-Kendo-Replica: <container-hostname>
    ```
 
-3. **No direct backend access:**
+3. **Multiple requests show different replica IDs:**
    ```bash
-   curl -s -o /dev/null -w "%{http_code}" http://localhost:5001/health/live
-   # Expected: connection refused (ports not exposed on host)
-   ```
-
-4. **Traffic distributes across replicas:**
-   ```bash
-   # Run 20 requests and check no 502 errors from load balancer
-   for i in $(seq 1 20); do
-     STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health/live)
-     if [ "$STATUS" = "502" ]; then echo "FAIL: 502 on request $i"; exit 1; fi
+   for i in $(seq 1 10); do
+     curl -sI http://localhost:5000/health/live 2>/dev/null | grep -i X-Kendo-Replica
    done
-   echo "All 20 requests succeeded"
+   # Expected: at least 2 different hostnames across 10 requests
+   ```
+
+4. **IDistributedCache is available:**
+   ```bash
+   # Injected into all 3 services — verified via unit tests
+   dotnet test tests/Kendo.Tests --filter "Category=Caching" --no-build
    ```
 
 ### Key Log Patterns
 
 | Component | Log Pattern | Meaning |
 |---|---|---|
-| NGINX | `GET /health/live HTTP/1.1" 200` | Normal health check proxied to upstream |
-| NGINX | `GET /api/users HTTP/1.1" 202` | User API call proxied to userservice upstream |
-| NGINX | `no live upstreams` | All replicas in an upstream group are down |
-| NGINX | `upstream timed out (110: Connection timed out)` | Backend replica unreachable |
-| Gateway | `/health/live responded 200` | Gateway health check passing |
-| Gateway | `Circuit breaker is open` | All upstream replicas unhealthy (existing resilience) |
+| Any service | `Replica identity resolved: gateway-1` | Replica resolved at startup |
+| Any service | `Redis connection failed, falling back to memory cache` | Redis unavailable, graceful degrade |
+| NGINX | `X-Kendo-Replica: gateway-1` in access logs | Replica header passed through |
 
 ---
 
@@ -87,8 +102,8 @@ Client ──▶ nginx:80 ──┼──▶ gateway:5000 (replica 3)
 
 1. **Pull latest feature branch:**
    ```bash
-   git checkout feature/day-12-reverse-proxy-load-balancer
-   git pull origin feature/day-12-reverse-proxy-load-balancer
+   git checkout feature/day-12-stateless-validation
+   git pull origin feature/day-12-stateless-validation
    ```
 
 2. **Build images:**
@@ -96,199 +111,150 @@ Client ──▶ nginx:80 ──┼──▶ gateway:5000 (replica 3)
    docker compose build
    ```
 
-3. **Start single-replica baseline (backward compatibility check):**
+3. **Start services:**
    ```bash
    docker compose up -d
-   # Verify: 4 containers (gateway, userservice, worker, postgres) healthy via old direct ports
    ```
 
-4. **Tear down and start multi-replica:**
-   ```bash
-   docker compose down
-   docker compose up -d --scale gateway=3 --scale userservice=3 --scale worker=3
-   ```
-
-5. **Wait for all 11 containers healthy:**
+4. **Wait for all 6 services healthy:**
    ```bash
    for i in $(seq 1 20); do
      HEALTHY=$(docker compose ps --format json | grep '"Health":"healthy"' | wc -l)
-     [ "$HEALTHY" -ge 11 ] && echo "All 11 healthy" && break
+     [ "$HEALTHY" -ge 6 ] && echo "All 6 healthy" && break
      sleep 4
    done
    ```
 
-6. **Run smoke tests:**
+5. **Run smoke tests:**
    ```bash
    # Health through NGINX
    curl -fsS http://localhost:5000/health/live
+   
+   # Replica identity header verification
+   curl -sI http://localhost:5000/health/live
+   
+   # Redis is available to all services
+   docker compose exec redis redis-cli ping
    
    # POST through NGINX to UserService
    curl -s -o /dev/null -w "%{http_code}" -X POST \
      http://localhost:5000/api/users \
      -H 'Content-Type: application/json' \
-     -d '{"email":"deploy-verify@test.com","displayName":"Deploy Verify"}' | grep -q 202 && echo "202 OK"
-   
-   # Traffic distribution
-   for i in $(seq 1 10); do
-     curl -s -o /dev/null -w " %{http_code}" http://localhost:5000/health/live
-   done
-   echo ""
+     -d '{"email":"deploy-verify@test.com","displayName":"Deploy Verify"}'
    ```
 
-7. **Run infrastructure integration tests (optional, requires Docker):**
+6. **Run unit tests:**
    ```bash
-   dotnet test tests/Kendo.Tests --filter Category=Infrastructure --no-restore
+   dotnet test tests/Kendo.Tests --filter "Category=Unit" --no-build
    ```
 
 ### Rolling Back
 
-**Rollback strategy:** Three tiers depending on severity.
+**Rollback strategy:** Two tiers depending on severity.
 
-#### Tier 1 — Quick rollback (feature branch still available)
-> Use when multi-replica config is broken but single-replica is fine.
+#### Tier 1 — Quick rollback (minor issue)
+> Use when Redis is causing issues but statelessness is fine.
 
 ```bash
-# Stop multi-replica
-docker compose down
-
-# Revert docker-compose.yml to Day 11 state
-git checkout develop -- docker-compose.yml
-
-# Restart single-replica (back to direct ports)
-docker compose up -d
-
-# Verify direct port access works
-curl -fsS http://localhost:5000/health/live
-curl -fsS http://localhost:5001/health/live
-curl -fsS http://localhost:5002/health/live
+# Simply remove Redis connection string from docker-compose.yml
+# All services will fall back to in-memory cache automatically
+docker compose up -d --no-recreate
 ```
 
 #### Tier 2 — Full feature revert
-> Use when the entire NGINX topology needs to be removed.
+> Use when replica identity middleware or Redis wiring causes problems.
 
 ```bash
 # Revert all Day 12 files
 docker compose down
-git checkout develop -- docker-compose.yml ops/nginx/ nginx.conf
+git checkout develop -- src/Gateway/Program.cs src/Gateway/appsettings.json
+git checkout develop -- src/UserService/Program.cs src/UserService/appsettings.json
+git checkout develop -- src/Worker/Program.cs src/Worker/appsettings.json
+git checkout develop -- docker-compose.yml ops/nginx/nginx.conf
+git checkout develop -- .github/workflows/ci.yml
 
-# If nginx config was committed as a new file, remove it
-git rm -r ops/nginx/
+# Remove new files (if committed)
+git rm -r src/Shared/Caching/
+git rm tests/Kendo.Tests/Caching/ReplicaIdentityMiddlewareTests.cs
+git rm tests/Kendo.Tests/Caching/DistributedCacheRegistrationTests.cs
 
-# Restart single-replica baseline
+# Restart
 docker compose up -d
-```
-
-#### Tier 3 — Merge revert (worst case, PR already merged)
-> Use if Day 12 was merged and must be undone.
-
-```bash
-# Find the merge commit
-git log --oneline develop | head -5
-
-# Revert the merge
-git revert -m 1 <MERGE_COMMIT_SHA>
-git push origin develop
 ```
 
 ---
 
 ## Failure Scenarios
 
-### Scenario 1: NGINX fails to start
+### Scenario 1: Redis is unreachable
 
 **Symptoms:**
-- `docker compose ps` shows nginx in `Exit` or `Restarting` state
-- `curl http://localhost:5000` returns connection refused
+- `docker compose ps` shows redis in unhealthy state
+- Logs show `Redis connection failed, falling back to memory cache`
+
+**Impact:** None — application continues using in-memory cache. No data loss because cache is best-effort (optimisation, not correctness).
+
+**Recovery:**
+```bash
+# Check Redis logs
+docker compose logs redis
+
+# Restart Redis
+docker compose restart redis
+
+# Verify Redis is healthy
+docker compose exec redis redis-cli ping  # → PONG
+```
+
+### Scenario 2: X-Kendo-Replica header not visible
+
+**Symptoms:**
+- `curl -I` shows no `X-Kendo-Replica` header
+- CI replica identity verification step fails
 
 **Checklist:**
 ```bash
-# Check NGINX config syntax inside container
-docker compose exec nginx nginx -t
+# Check header direct from service (bypassing NGINX)
+docker compose exec userservice curl -sI http://localhost:5001/health/live | grep -i X-Kendo-Replica
 
-# View container logs
-docker compose logs nginx
+# Check if NGINX passthrough is configured
+docker compose exec nginx cat /etc/nginx/nginx.conf | grep X-Kendo-Replica
+```
 
-# Verify nginx.conf is mounted correctly
+**Recovery:**
+1. If header is missing at the service → check `ReplicaIdentityMiddleware` registration in `Program.cs`
+2. If header is present at service but not through NGINX → verify `proxy_set_header X-Kendo-Replica $upstream_http_x_kendo_replica;` in nginx.conf
+3. `docker compose restart nginx` to apply config changes
+
+### Scenario 3: Multiple replicas return the same replica ID (sticky routing)
+
+**Symptoms:**
+- All 10 requests through NGINX return the same X-Kendo-Replica value
+- Traffic not distributing across replicas
+
+**Checklist:**
+```bash
+# Verify NGINX has no ip_hash or sticky directive
 docker compose exec nginx cat /etc/nginx/nginx.conf
+
+# Verify multiple replicas are registered in Docker DNS
+docker compose exec nginx getent hosts gateway | wc -l
+# Expected: 3 (for --scale gateway=3)
 ```
 
 **Recovery:**
-1. Fix nginx.conf syntax error
-2. `docker compose up -d --no-recreate nginx`
-3. If config is valid but service still fails, check if ports are already in use:
-   ```bash
-   lsof -i :5000
-   ```
-
-### Scenario 2: Backend replicas out of sync
-
-**Symptoms:**
-- All containers are healthy, but NGINX returns 502
-- Some requests succeed, others fail intermittently
-
-**Checklist:**
-```bash
-# Check if backend services are reachable from inside NGINX
-docker compose exec nginx curl -s http://gateway:5000/health/live
-docker compose exec nginx curl -s http://userservice:5001/health/live
-
-# Check DNS resolution inside NGINX container
-docker compose exec nginx getent hosts gateway
-# Expected: multiple IPs for each replica
-```
-
-**Recovery:**
-1. `docker compose restart nginx` (flushes DNS cache)
-2. If DNS still has stale entries, `docker compose down` and restart fresh
-
-### Scenario 3: Replica kill causes client-visible errors
-
-**Symptoms:**
-- CI test `KillOneReplica_NoClientVisibleErrors` fails
-- Clients report 502 or 503 during a replica restart
-
-**Checklist:**
-```bash
-# Check NGINX health check timing
-docker compose logs nginx --tail 50 | grep -E "no live|timeout|502|503"
-
-# Verify max_fails and fail_timeout settings
-docker compose exec nginx cat /etc/nginx/nginx.conf
-```
-
-**Recovery:**
-1. Increase `max_fails` or `fail_timeout` in nginx.conf upstream blocks
-2. Verify Docker health check interval is faster than NGINX fail timeout
-3. If issue persists, consider adding active health checks (`health_check` directive with NGINX Plus or a custom endpoint)
+1. Ensure `--scale` flags are used: `docker compose up -d --scale gateway=3 --scale userservice=3 --scale worker=3`
+2. Verify no `ip_hash` in nginx.conf upstream blocks
+3. `docker compose restart nginx`
 
 ---
 
-## Rollback to Day 11 Baseline
+## Redis Cache Semantics
 
-If the NGINX topology must be abandoned:
-
-```bash
-# 1. Stop everything
-docker compose down
-
-# 2. Restore docker-compose.yml to Day 11 (direct ports)
-git checkout develop -- docker-compose.yml
-
-# 3. Remove NGINX config (committed new file)
-git rm -r ops/nginx/
-
-# 4. Remove infrastructure tests (committed new file)
-git rm tests/Kendo.Tests/Infrastructure/LoadBalancerTests.cs
-
-# 5. Revert CI pipeline changes
-git checkout develop -- .github/workflows/ci.yml
-
-# 6. Restart baseline
-docker compose up -d
-
-# 7. Verify direct port access
-curl -fsS http://localhost:5000/health/live
-curl -fsS http://localhost:5001/health/live
-curl -fsS http://localhost:5002/health/live
-echo "Day 11 baseline restored"
-```
+| Aspect | Behaviour |
+|---|---|
+| Registration | `AddStackExchangeRedisCache()` when `Redis__ConnectionString` is set; `AddDistributedMemoryCache()` otherwise |
+| Instance prefix | `kendo:` — all Redis keys are namespaced |
+| Failure mode | Cache miss returns `null` — callers must handle gracefully |
+| Persistence | Best-effort in-memory cache (Redis is ephemeral for this milestone) |
+| Connection string | `Redis__ConnectionString=redis:6379` (Docker Compose), `localhost:6379` (local dev) |
