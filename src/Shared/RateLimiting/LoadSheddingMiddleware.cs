@@ -60,7 +60,7 @@ public class LoadSheddingMiddleware
         {
             _logger.LogWarning(
                 "Load shedding — max concurrency ({MaxConcurrency}) reached for {Method} {Path}",
-                _limiter.GetStatistics().CurrentQueuedCount,
+                _limiter.GetStatistics()?.CurrentQueuedCount ?? 0,
                 context.Request.Method,
                 context.Request.Path);
 
