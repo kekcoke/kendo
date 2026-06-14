@@ -71,8 +71,8 @@
 
 | Component | Description | Status |
 |---|---|---|
-| `Rebus` | Azure Service Bus transport, DI registration, topology configuration | ~ |
-| `Azure Service Bus` | Topic/subscription or queue provisioned; connection string externalized | ~ |
+| `Rebus` | Azure Service Bus transport, DI registration, topology configuration | ✅ |
+| `Azure Service Bus` | Queue `kendo-events` provisioned via config; connection string externalized via `Rebus__ConnectionString` env var | ✅ |
 | `Async `202` Endpoint` | At least one POST refactored; synchronous path removed | ~ |
 | `Message Consumer` | Worker Service handler, idempotency key enforced per message type | ~ |
 | `Dead Letter Queue Consumer` | DLQ handler, alert-on-threshold, structured log on every receipt | ~ |

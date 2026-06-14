@@ -8,11 +8,11 @@
 ## Session Variables
 
 ```yaml
-current_day: 6
+current_day: 7
 current_phase: 0        # 0=Init · 0b=Bootstrap · 1=Architect · 2=Dev+QA · 4=DevOps · 4b=Review · 5=State Update
 branch_base: develop
 feature_branch: ~       # resolved in Phase 1 from {{SLUG}}
-phase_plan: "01"        # platform_roadmap.md phase reference
+phase_plan: "02"        # platform_roadmap.md phase reference
 ```
 
 ---
@@ -20,9 +20,9 @@ phase_plan: "01"        # platform_roadmap.md phase reference
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* M1.5 RFC 7807 Problem Details delivered: `ProblemDetailsMiddleware` catches all unhandled exceptions across all 3 services and returns standardized `application/problem+json` responses with OpenTelemetry trace ID correlation.
-* 39/39 xUnit tests passing (29 existing + 10 new ProblemDetails middleware tests); all 3 Program.cs files wired with middleware and consistent JSON serialization config.
-* Next: M1.6 — Health check endpoints already ✅. Phase 01 complete — next session should move to Phase 02 (Async Decoupling). Carry-forward: none.
+* M2.1 Rebus + Azure Service Bus wired across all 3 services: `KendoRebusConfiguration.AddKendoRebus()` extension with producer/consumer modes, `KendoMessage` base record, graceful-skip for local dev without ASB connection string.
+* 43/43 xUnit tests passing (39 existing + 4 new Messaging registration tests); Gateway + UserService producers, Worker consumer; CI updated with `Category=Messaging` step; CI `Wait for healthy` race condition fixed.
+* Next: M2.2 — First async endpoint (`202 Accepted`). Phase 02 continues. Carry-forward: none. CI hotfix for `Wait for healthy` applied (all 4 services, not just first).
 
 ---
 
@@ -96,6 +96,21 @@ phase_plan: "01"        # platform_roadmap.md phase reference
 
 ---
 
+## Phase Outputs — Day 06
+> Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
+
+| Phase | Artifact | Status |
+|---|---|---|
+| 0 | State initialized, variables resolved → M2.1 Rebus + ASB wired | ✅ |
+| 0b | *Skipped* (repo has prior commits) | ✅ |
+| 1 | `docs/architecture/day_06_spec.md` | ✅ |
+| 2 | Commit log — zero halted units — feature branch on `origin` | ✅ |
+| 4 | `ops/Dockerfile` milestone label · `.github/workflows/ci.yml` (messaging step + Wait-for-healthy fix) · `ops/runbooks/day_06_runbook.md` | ✅ |
+| 4b | `docs/architecture/day_06_review_report.md` + PR #7 merged to `develop` | ✅ |
+| 5 | State update, roadmap update, changelog, validation | ✅ |
+
+---
+
 ## Incomplete Tasks
 > Tasks started this day but halted (lint/test failure, spec ambiguity, reviewer FAIL routing).  
 > **Must be empty before Day N+1 can begin.** Populated by Reviewer FAIL verdict or commit-gate halt.
@@ -130,6 +145,7 @@ phase_plan: "01"        # platform_roadmap.md phase reference
 | 03 | Resilience baseline | Polly Retry + Circuit Breaker on DB + HTTP clients, shared resilience pipeline, 25 tests (13 resilience), CI updated | PR #4 merged to develop | ✅ |
 | 04 | Observability foundation | OpenTelemetry console exporter, trace-ID correlation, structured Polly logging, CI PostgreSQL fix, 29 tests (4 observability) | PR #5 merged to develop | ✅ |
 | 05 | RFC 7807 Problem Details | `KendoProblemDetails` DTO + `ProblemDetailsMiddleware` in Kendo.Shared, wired into all 3 services, 10 new tests, Dockerfile context fix | PR #6 merged to develop | ✅ |
+| 06 | Rebus + Azure Service Bus wired | `KendoMessage` + `KendoRebusConfiguration` in Kendo.Shared; Gateway + UserService producers, Worker consumer; 4 Messaging tests; CI fix (Wait for all 4 healthy) | PR #7 merged to develop | ✅ |
 
 ---
 
@@ -143,7 +159,8 @@ phase_plan: "01"        # platform_roadmap.md phase reference
 | Redis | Cache / State | Distributed circuit breaker state | Day 00 | ~ |
 | Gateway | Web API | API routing, auth, rate limiting | Day 01 | Angular Web App, UserService |
 | UserService | Web API | User domain logic, EF Core | Day 01 | Gateway |
-| Worker | Background Service | Async processing, health endpoint | Day 01 | Rebus (future) |
+| Worker | Background Service | Async processing, health endpoint, Rebus consumer | Day 01 | Rebus (ASB), Gateway, UserService |
+| Rebus (ASB transport) | Message Bus | Azure Service Bus transport via Rebus, producer + consumer modes, `kendo-events` queue | Day 06 | Gateway (producer), UserService (producer), Worker (consumer) |
 
 ---
 
@@ -153,11 +170,12 @@ phase_plan: "01"        # platform_roadmap.md phase reference
 * **Services:** Gateway (port 5000), UserService (port 5001), Worker (port 5002), PostgreSQL (port 5432) — all containerized
 * **Docker Compose:** All four services with health checks; PostgreSQL (5s interval), app services (10s interval); `depends_on` postgres healthy → userservice
 * **Database:** PostgreSQL 16 + pgvector (`pgvector/pgvector:pg16`), `kendo_users` DB, `vector` extension enabled via EF Core migration
-* **Branches:** `main` (scaffolding), `develop` (PR #6 squash-merged — Day 05) — both on `origin`
-* **Pipelines:** CI pipeline active (`.github/workflows/ci.yml`) — build → unit tests → data integration tests (with pgvector service container) → resilience tests → docker compose health verification. OTel observability tests added to suite.
-* **Tests:** 39/39 xUnit tests passing (8 health-check + 4 data integration + 13 resilience + 4 observability + 10 ProblemDetails middleware)
+* **Messaging:** Rebus registered with Azure Service Bus transport — Gateway + UserService in producer mode (one-way client), Worker in consumer mode (polls `kendo-events`, 3 workers). Graceful skip when `Rebus__ConnectionString` is missing (local dev).
+* **Branches:** `main` (scaffolding), `develop` (PR #7 squash-merged — Day 06) — both on `origin`
+* **Pipelines:** CI pipeline active (`.github/workflows/ci.yml`) — build → unit tests → data integration tests (with pgvector service container) → resilience tests → **messaging tests** → docker compose health verification. CI `Wait for healthy` step hardened to wait for all 4 services.
+* **Tests:** 43/43 xUnit tests passing (8 health-check + 4 data integration + 13 resilience + 4 observability + 10 ProblemDetails middleware + 4 Messaging registration)
 * **Observability:** All 3 services emit OpenTelemetry traces to console exporter; trace IDs correlated in all ILogger log lines; Polly callbacks emit structured logs with trace context; error responses include trace ID in RFC 7807 `traceId` field
-* **Local:** API instances: 3 (Gateway, UserService, Worker), Postgres: 1 (Docker), RabbitMQ: 1 (infrastructure), Redis: 1 (infrastructure)
+* **Local:** API instances: 3 (Gateway, UserService, Worker), Postgres: 1 (Docker), RabbitMQ: 1 (infrastructure, not yet consumed), Redis: 1 (infrastructure)
 
 ---
 
@@ -178,3 +196,4 @@ phase_plan: "01"        # platform_roadmap.md phase reference
 * **OpenTelemetry:** All services emit OpenTelemetry traces to console exporter via `AddKendoObservability()` extension method in `Kendo.Shared`. Trace IDs auto-correlated in `ILogger` output via ASP.NET Core `Activity.Current.TraceId`. Console exporter for dev/CI; OTLP exporter conditionally switchable via `OTEL_EXPORTER_OTLP_ENDPOINT` in production. *(Day 04)*
 * **CI PostgreSQL:** CI `build-and-test` job uses `pgvector/pgvector:pg16` service container for data integration tests. Connection string externalized via `ConnectionStrings__DefaultConnection` env var. *(Day 04)*
 * **RFC 7807 Problem Details:** All 3 services return `application/problem+json` on all 4xx/5xx responses via shared `ProblemDetailsMiddleware` in `Kendo.Shared`. Exception→status mapping: `ArgumentException`→400, `KeyNotFoundException`→404, `OperationCanceledException`→503, generic→500, client-disconnect→499. Health endpoints exempt. *(Day 05)*
+* **Async Messaging — Rebus:** Rebus `10.7.2` + `Rebus.AzureServiceBus` `10.7.0` added to all 3 services. Shared `AddKendoRebus()` extension in `Kendo.Shared.Messaging` with producer (one-way ASB client, auto-skip on missing connection string) and consumer (ASB queue `kendo-events`, 3 workers, 10 parallelism) modes. `KendoMessage` abstract record defines base message shape (`MessageId`, `CreatedAt`). *(Day 06)*
