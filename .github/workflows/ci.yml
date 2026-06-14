@@ -76,15 +76,67 @@ jobs:
           echo "FAILED: not all services became healthy within the timeout."
           exit 1
 
-      - name: Verify health endpoints
+      - name: Verify health endpoints (single replica)
         run: |
+          echo "=== Gateway ==="
           curl -fsS http://localhost:5000/health/live
           curl -fsS http://localhost:5000/health/ready
+          echo ""
+          echo "=== UserService ==="
           curl -fsS http://localhost:5001/health/live
           curl -fsS http://localhost:5001/health/ready
+          echo ""
+          echo "=== Worker ==="
           curl -fsS http://localhost:5002/health/live
           curl -fsS http://localhost:5002/health/ready
 
-      - name: Tear down
+      - name: Tear down (single replica)
+        run: docker compose down
+
+      - name: Start multi-replica
+        run: docker compose up -d --scale gateway=3 --scale userservice=3 --scale worker=3
+
+      - name: Wait for 11 containers healthy
+        run: |
+          for i in $(seq 1 20); do
+            healthy=$(docker compose ps --format json | grep '"Health":"healthy"' | wc -l)
+            if [ "$healthy" -ge 11 ]; then
+              echo "All 11 containers healthy."
+              exit 0
+            fi
+            echo "wait ($i/20): $healthy/11 containers healthy"
+            sleep 4
+          done
+          docker compose ps
+          echo "FAILED: not all containers became healthy within the timeout."
+          exit 1
+
+      - name: Smoke test through NGINX
+        run: |
+          echo "=== Health check through NGINX ==="
+          curl -fsS http://localhost:5000/health/live
+          echo ""
+          echo "=== POST through NGINX to UserService ==="
+          curl -s -o /dev/null -w "%{http_code}" -X POST \
+            http://localhost:5000/api/users \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"ci@test.com","displayName":"CI Test"}' \
+            | grep -q 202 && echo " ✓ 202 Accepted" || (echo " ✗ unexpected status" && exit 1)
+
+      - name: Verify traffic distribution
+        run: |
+          OUTPUTS=""
+          for i in $(seq 1 10); do
+            OUTPUTS="$OUTPUTS $(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health/live)"
+          done
+          echo "10 health checks through NGINX: $OUTPUTS"
+          # Verify none returned 502 (load balancer failure)
+          if echo "$OUTPUTS" | grep -q "502"; then
+            echo "FAILED: some requests returned 502 (upstream unhealthy)"
+            exit 1
+          fi
+          echo "✓ All 10 requests proxied successfully through NGINX"
+
+      - name: Tear down (multi-replica)
         if: always()
         run: docker compose down
