@@ -108,8 +108,15 @@ public class OutboxRelayService : BackgroundService
                     continue;
                 }
 
+                // Build optional headers with traceparent for trace correlation
+                var headers = new Dictionary<string, string>();
+                if (!string.IsNullOrWhiteSpace(outboxMessage.TraceContext))
+                {
+                    headers["traceparent"] = outboxMessage.TraceContext;
+                }
+
                 // Publish via Rebus
-                await bus.Send(domainMessage);
+                await bus.Send(domainMessage, headers);
 
                 // Mark as processed
                 outboxMessage.ProcessedAt = DateTimeOffset.UtcNow;
