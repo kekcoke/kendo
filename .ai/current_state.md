@@ -8,7 +8,7 @@
 ## Session Variables
 
 ```yaml
-current_day: 13
+current_day: 14
 current_phase: 0        # 0=Init · 0b=Bootstrap · 1=Architect · 2=Dev+QA · 4=DevOps · 4b=Review · 5=State Update
 branch_base: develop
 feature_branch: ~       # resolved in Phase 1 from {{SLUG}}
@@ -20,9 +20,9 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* **M3.2 complete** — Redis distributed cache (`AddStackExchangeRedisCache` / `AddDistributedMemoryCache` fallback) wired into all 3 services. `ReplicaIdentityMiddleware` appends `X-Kendo-Replica` header (Docker HOSTNAME) on every response. NGINX passes header through to caller. Redis service (redis:7-alpine) in Docker Compose. CI updated with Redis service container (6/12 health thresholds) and replica header verification.
-* 76/76 unit tests passing (7 new caching tests). CI fully green: build-and-test (56s) + docker-compose (1m35s). PR #15 squash-merged into `develop`.
-* Next: **M3.3** — Chaos suite: automated tests simulating DB downtime, service crash, and network partition — all integrated into CI.
+* **M3.3 complete** — Chaos test suite added: xUnit `ChaosTestFixture` + bash scripts cover DB downtime (circuit breaker fallback, no cascade), service crash (NGINX re-route), and network partition (outbox + async path). All 3 scenarios produce structured PASS/FAIL/SKIP reports.
+* 76/76 unit tests still passing (no regression). New `chaos-test` CI job runs after `docker-compose`, invokes `run_all.sh` on multi-replica stack. PR #16 squash-merged into `develop`.
+* Next: **M3.4** — Rate limiting & load shedding: `429 + Retry-After` at Gateway, `503` RFC 7807 under extreme concurrency.
 
 ---
 
@@ -149,6 +149,9 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 | 0 | State initialized, variables resolved → M3.3 Chaos suite | ✅ |
 | 0b | *Skipped* (repo has prior commits) | ✅ |
 | 1 | `docs/architecture/day_13_spec.md` | ✅ |
+| 2 | Commit log — 5/5 units committed, zero halted — feature branch on `origin` | ✅ |
+| 4 | `ops/runbooks/day_13_runbook.md` — `chaos-test` job in `.github/workflows/ci.yml` | ✅ |
+| 4b | `docs/architecture/day_13_review_report.md` + PR #16 merged to `develop` | ✅ |
 
 ---
 
@@ -194,6 +197,7 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 | 11 | Async observability: traceparent propagation (M2.6) | `OutboxMessage.TraceContext` column; ambient `Activity.Current?.Id` capture; `traceparent` Rebus header; child Activity in Worker handler; EF migration; 17 new tests | PR #12 merged to develop | ✅ |
 | 12 | Reverse proxy load balancer (M3.1) | `ops/nginx/nginx.conf`, `docker-compose.yml` NGINX + `expose:`, multi-replica CI, 5 infra tests, runbook | PR #14 squashed to `develop` | ✅ |
 | 12 | Stateless validation & Redis (M3.2) | Redis distributed cache, replica identity middleware, X-Kendo-Replica header, sticky-session disable, 7 new tests (76 total) | PR #15 squashed to `develop` | ✅ |
+| 13 | Chaos test suite (M3.3) | xUnit chaos tests (DB downtime, service crash, network partition), bash scripts, chaos-test CI job, runbook, 3 new test files | PR #16 merged to `develop` | ✅ |
 
 ---
 
@@ -220,6 +224,12 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 > Full replacement each session. Reflects current known state of all services, DBs, queues, pipelines.
 
 * **Services:** Gateway (port 5000 behind NGINX), UserService (port 5001 expose), Worker (port 5002 expose), PostgreSQL (port 5432), Redis (port 6379), NGINX (port 80 internal, 5000 host) — all containerized
+* **Docker Compose:** All 6 services with health checks; multi-replica (3 each) scaling for chaos testing
+* **Chaos Test Suite:** 3 xUnit tests (`Category=Chaos`) with Docker CLI integration. 3 bash scripts in `scripts/chaos/`. CI job `chaos-test` runs after `docker-compose`, invokes `run_all.sh` on multi-replica stack, uploads structured results artifact
+* **Tests:** 76/76 unit tests passing (existing suite). 3 new chaos test files added (Docker-dependent, auto-skip when unavailable)
+* **Branches:** `develop` (PR #16 squash-merged — Day 13) — on `origin`
+* **Pipelines:** CI pipeline active: build-and-test -> docker-compose -> chaos-test (new)
+
 * **Docker Compose:** All 6 services with health checks; PostgreSQL (5s interval), app services (10s interval), Redis (5s interval), NGINX (10s interval, wget self-health); `depends_on` postgres healthy → userservice
 * **Database:** PostgreSQL 16 + pgvector (`pgvector/pgvector:pg16`), `kendo_users` DB, `vector` extension enabled via EF Core migration
 * **Messaging:** Rebus registered with Azure Service Bus transport — Gateway + UserService in producer mode (one-way client), Worker in consumer mode (polls `kendo-events`, 3 workers). Graceful skip when `Rebus__ConnectionString` is missing (local dev).
