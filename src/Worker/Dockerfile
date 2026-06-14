@@ -5,11 +5,15 @@ WORKDIR /app
 # Copy all project files for restore layer caching
 COPY Worker/Kendo.Worker.csproj Worker/
 COPY Shared/Kendo.Shared.csproj Shared/
+COPY UserService/Kendo.UserService.csproj UserService/
 RUN dotnet restore Worker/Kendo.Worker.csproj
 
-# Copy all source and publish
+# Copy all source
 COPY . .
-RUN dotnet publish Worker/Kendo.Worker.csproj -c Release -o /out
+
+# Publish Worker; suppress content-file conflicts from ref projects, then restore Worker's config
+RUN dotnet publish Worker/Kendo.Worker.csproj -c Release -o /out /p:ErrorOnDuplicatePublishOutputFiles=false && \
+    cp Worker/appsettings*.json /out/
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app

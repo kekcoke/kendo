@@ -10,10 +10,14 @@
     <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="10.0.9" />
     <PackageReference Include="Rebus.ServiceProvider" Version="10.7.2" />
     <PackageReference Include="Rebus.AzureServiceBus" Version="10.7.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0-preview.1" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0-preview.1.25081.1" />
+    <PackageReference Include="Polly.Core" Version="8.7.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Shared\Kendo.Shared.csproj" />
+    <ProjectReference Include="..\UserService\Kendo.UserService.csproj" />
   </ItemGroup>
 
 </Project>
