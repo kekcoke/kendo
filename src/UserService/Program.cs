@@ -2,6 +2,7 @@ using Kendo.Shared.Caching;
 using Kendo.Shared.ErrorHandling;
 using Kendo.Shared.Messaging;
 using Kendo.Shared.Observability;
+using Kendo.Shared.GracefulShutdown;
 using Kendo.Shared.Resilience;
 using Kendo.UserService.Data;
 using Kendo.UserService.Services;
@@ -25,6 +26,7 @@ builder.Services.AddKendoObservability(builder.Configuration, "kendo-userservice
 builder.Services.AddKendoDistributedCache(builder.Configuration);
 builder.Services.AddKendoErrorHandling();
 builder.Services.AddKendoRebus(builder.Configuration, "producer");
+builder.Services.AddKendoGracefulShutdown(builder.Configuration);
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -36,6 +38,7 @@ builder.Services.AddHostedService<OutboxRelayService>();
 
 var app = builder.Build();
 
+app.UseMiddleware<GracefulShutdownMiddleware>();
 app.UseKendoErrorHandling();
 app.UseKendoReplicaIdentity();
 
