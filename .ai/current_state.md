@@ -204,7 +204,7 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 ## Carry-Forward Items
 > Open blockers, homework, and unresolved decisions. Remove when resolved; append when new ones arise.
 
-- **chaos-test CI flakiness (Day 15):** `test_db_downtime` chaos test intermittently fails in CI returning `000000` (connection refused) instead of expected 503. Observed on PR #19 CI run. Pre-existing issue from Day 13 — no changes to chaos scripts, Dockerfiles, or docker-compose were made this session. Root cause investigation deferred to M3.5 carry-forward; M3.6 runbook effort should include documenting this flakiness.
+- **chaos-test CI flakiness (Day 13/15/16):** `test_db_downtime` chaos test intermittently fails in CI returning `000000` (connection refused) instead of expected 503. **Fully documented in M3.6 runbooks** — see `ops/runbooks/db-failover.md` §Known CI Flakiness for symptom, suspected root cause, and 3 mitigation approaches. Not blocking CI (~90% pass rate). Carry-forward maintained for engineering action — recommended mitigation #2 (retry loop after `docker compose unpause`) should be applied to `scripts/chaos/test_db_downtime.sh`.
 
 ---
 
