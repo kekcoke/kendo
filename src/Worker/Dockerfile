@@ -11,8 +11,9 @@ RUN dotnet restore Worker/Kendo.Worker.csproj
 # Copy all source
 COPY . .
 
-# Publish Worker directly; suppress content-file conflicts from ref projects
-RUN dotnet publish Worker/Kendo.Worker.csproj -c Release -o /out /p:ErrorOnDuplicatePublishOutputFiles=false
+# Publish Worker; suppress content-file conflicts from ref projects, then restore Worker's config
+RUN dotnet publish Worker/Kendo.Worker.csproj -c Release -o /out /p:ErrorOnDuplicatePublishOutputFiles=false && \
+    cp Worker/appsettings*.json /out/
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
