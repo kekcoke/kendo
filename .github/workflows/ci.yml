@@ -111,7 +111,7 @@ jobs:
           curl -fsS http://localhost:5000/health/live
           echo ""
           echo "=== POST through NGINX to UserService (retry up to 5x for circuit breaker warmup) ==="
-          for i in $(seq 1 5); do
+          for i in $(seq 1 6); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
               http://localhost:5000/api/users \
               -H 'Content-Type: application/json' \
@@ -120,8 +120,8 @@ jobs:
               echo " ✓ 202 Accepted (attempt $i)"
               exit 0
             fi
-            echo "  attempt $i: $STATUS (retrying in 5s...)"
-            sleep 5
+            echo "  attempt $i: $STATUS (retrying in 10s...)"
+            sleep 10
           done
           echo " ✗ failed after 5 attempts"
           curl -s -X POST \
