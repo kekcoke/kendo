@@ -8,8 +8,8 @@
 ## Session Variables
 
 ```yaml
-current_day: 8
-current_phase: 2        # 2=Dev+QA · 0b=Bootstrap · 1=Architect · 2=Dev+QA · 4=DevOps · 4b=Review · 5=State Update
+current_day: 9
+current_phase: 0        # 0=Init · 0b=Bootstrap · 1=Architect · 2=Dev+QA · 4=DevOps · 4b=Review · 5=State Update
 branch_base: develop
 feature_branch: ~       # resolved in Phase 1 from {{SLUG}}
 phase_plan: "02"        # platform_roadmap.md phase reference
@@ -20,9 +20,9 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* M2.2 — First async endpoint (`POST /api/users` returning 202 Accepted) implemented in UserService: `UsersController`, `UserRepository`, `User` entity with status tracking, `UserCreatedEvent` domain message, EF Core migration adding Users table.
-* 27/27 unit tests passing (18 existing + 9 new for controller + repository); PR #8 squash-merged into `develop`.
-* Next: M2.3 — Background consumer with idempotency key enforcement. Phase 02 continues. Carry-forward: none.
+* M2.3 — Background consumer with idempotency key enforcement: Worker consumes `UserCreatedEvent` via Rebus; `IdempotencyRecords` table tracks processed messages; duplicate suppression + crash recovery implemented.
+* 33/33 unit tests passing (26 existing + 7 new handler tests); PR #9 squash-merged into `develop`.
+* Next: M2.4 — Dead Letter Queue consumer and alerting. Phase 02 continues. Carry-forward: none.
 
 ---
 
@@ -147,6 +147,7 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 | 05 | RFC 7807 Problem Details | `KendoProblemDetails` DTO + `ProblemDetailsMiddleware` in Kendo.Shared, wired into all 3 services, 10 new tests, Dockerfile context fix | PR #6 merged to develop | ✅ |
 | 06 | Rebus + Azure Service Bus wired | `KendoMessage` + `KendoRebusConfiguration` in Kendo.Shared; Gateway + UserService producers, Worker consumer; 4 Messaging tests; CI fix (Wait for all 4 healthy) | PR #7 merged to develop | ✅ |
 | 07 | First async endpoint (M2.2) | `UsersController` (POST 202 + GET status), `User` entity, `UserCreatedEvent`, EF migration, 9 new tests, runbook | PR #8 merged to develop | ✅ |
+| 08 | Background consumer (M2.3) | `UserCreatedEventHandler`, `IdempotencyRecords` table, idempotency enforcement, crash recovery, 7 new handler tests, runbook | PR #9 merged to develop | ✅ |
 
 ---
 
@@ -162,6 +163,7 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 | UserService | Web API | User domain logic, EF Core | Day 01 | Gateway |
 | Worker | Background Service | Async processing, health endpoint, Rebus consumer | Day 01 | Rebus (ASB), Gateway, UserService |
 | Rebus (ASB transport) | Message Bus | Azure Service Bus transport via Rebus, producer + consumer modes, `kendo-events` queue | Day 06 | Gateway (producer), UserService (producer), Worker (consumer) |
+| IdempotencyRecords | DB table | Tracks processed messages by MessageId PK; enforces idempotency, enables crash recovery | Day 08 | Worker (UserCreatedEventHandler) |
 
 ---
 
@@ -172,9 +174,10 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 * **Docker Compose:** All four services with health checks; PostgreSQL (5s interval), app services (10s interval); `depends_on` postgres healthy → userservice
 * **Database:** PostgreSQL 16 + pgvector (`pgvector/pgvector:pg16`), `kendo_users` DB, `vector` extension enabled via EF Core migration
 * **Messaging:** Rebus registered with Azure Service Bus transport — Gateway + UserService in producer mode (one-way client), Worker in consumer mode (polls `kendo-events`, 3 workers). Graceful skip when `Rebus__ConnectionString` is missing (local dev).
+* **Idempotency:** `IdempotencyRecords` table (WorkerDbContext) tracks message processing status (Processing/Completed/Failed). MessageId PK enforces uniqueness. Crash recovery re-processes messages left in Processing state. All handlers wrap DB ops in transactions.
 * **Branches:** `main` (scaffolding), `develop` (PR #7 squash-merged — Day 06) — both on `origin`
 * **Pipelines:** CI pipeline active (`.github/workflows/ci.yml`) — build → unit tests → data integration tests (with pgvector service container) → resilience tests → **messaging tests** → docker compose health verification. CI `Wait for healthy` step hardened to wait for all 4 services.
-* **Tests:** 43/43 xUnit tests passing (8 health-check + 4 data integration + 13 resilience + 4 observability + 10 ProblemDetails middleware + 4 Messaging registration)
+* **Tests:** 50/50 xUnit tests passing (8 health-check + 4 data integration + 13 resilience + 4 observability + 10 ProblemDetails middleware + 4 Messaging registration + 7 Worker handler idempotency)
 * **Observability:** All 3 services emit OpenTelemetry traces to console exporter; trace IDs correlated in all ILogger log lines; Polly callbacks emit structured logs with trace context; error responses include trace ID in RFC 7807 `traceId` field
 * **Local:** API instances: 3 (Gateway, UserService, Worker), Postgres: 1 (Docker), RabbitMQ: 1 (infrastructure, not yet consumed), Redis: 1 (infrastructure)
 
@@ -198,3 +201,4 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 * **CI PostgreSQL:** CI `build-and-test` job uses `pgvector/pgvector:pg16` service container for data integration tests. Connection string externalized via `ConnectionStrings__DefaultConnection` env var. *(Day 04)*
 * **RFC 7807 Problem Details:** All 3 services return `application/problem+json` on all 4xx/5xx responses via shared `ProblemDetailsMiddleware` in `Kendo.Shared`. Exception→status mapping: `ArgumentException`→400, `KeyNotFoundException`→404, `OperationCanceledException`→503, generic→500, client-disconnect→499. Health endpoints exempt. *(Day 05)*
 * **Async Messaging — Rebus:** Rebus `10.7.2` + `Rebus.AzureServiceBus` `10.7.0` added to all 3 services. Shared `AddKendoRebus()` extension in `Kendo.Shared.Messaging` with producer (one-way ASB client, auto-skip on missing connection string) and consumer (ASB queue `kendo-events`, 3 workers, 10 parallelism) modes. `KendoMessage` abstract record defines base message shape (`MessageId`, `CreatedAt`). *(Day 06)*
+* **Idempotency — MessageId Key:** `KendoMessage.MessageId` used as idempotency key. `IdempotencyRecords` table in WorkerDbContext tracks Processing/Completed/Failed states. MessageId PK enforces unique constraint. Crash recovery re-processes Processing-state messages. *(Day 08)*
