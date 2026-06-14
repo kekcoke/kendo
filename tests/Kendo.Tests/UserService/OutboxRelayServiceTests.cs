@@ -103,6 +103,70 @@ public class OutboxRelayServiceTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_PassesTraceparentHeader()
+    {
+        var (scopeFactory, db, busMock) = CreateRelaySut(nameof(ExecuteAsync_PassesTraceparentHeader));
+
+        // Seed a pending outbox message with TraceContext
+        var traceParent = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01";
+        var message = new UserCreatedEvent
+        {
+            UserId = Guid.NewGuid(),
+            Email = "traceheader@example.com",
+            DisplayName = "Trace Header"
+        };
+        db.OutboxMessages.Add(new OutboxMessage
+        {
+            MessageId = message.MessageId,
+            MessageType = KendoMessageSerializer.GetMessageType(message),
+            Payload = KendoMessageSerializer.Serialize(message),
+            CreatedAt = DateTimeOffset.UtcNow,
+            TraceContext = traceParent
+        });
+        await db.SaveChangesAsync();
+
+        var relay = new OutboxRelayService(scopeFactory, CreateConfig(), NullLogger<OutboxRelayService>.Instance);
+        await relay.ProcessBatchAsync(CancellationToken.None);
+
+        // Verify the message was published with traceparent header
+        busMock.Verify(b => b.Send(
+            It.Is<UserCreatedEvent>(e => e.Email == "traceheader@example.com"),
+            It.Is<IDictionary<string, string>>(h =>
+                h.ContainsKey("traceparent") && h["traceparent"] == traceParent)), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SkipsTraceparentHeader_WhenTraceContextNull()
+    {
+        var (scopeFactory, db, busMock) = CreateRelaySut(nameof(ExecuteAsync_SkipsTraceparentHeader_WhenTraceContextNull));
+
+        // Seed a pending outbox message WITHOUT TraceContext (null)
+        var message = new UserCreatedEvent
+        {
+            UserId = Guid.NewGuid(),
+            Email = "notraceheader@example.com",
+            DisplayName = "No Trace Header"
+        };
+        db.OutboxMessages.Add(new OutboxMessage
+        {
+            MessageId = message.MessageId,
+            MessageType = KendoMessageSerializer.GetMessageType(message),
+            Payload = KendoMessageSerializer.Serialize(message),
+            CreatedAt = DateTimeOffset.UtcNow,
+            TraceContext = null
+        });
+        await db.SaveChangesAsync();
+
+        var relay = new OutboxRelayService(scopeFactory, CreateConfig(), NullLogger<OutboxRelayService>.Instance);
+        await relay.ProcessBatchAsync(CancellationToken.None);
+
+        // Verify the message was published WITHOUT traceparent header
+        busMock.Verify(b => b.Send(
+            It.Is<UserCreatedEvent>(e => e.Email == "notraceheader@example.com"),
+            It.Is<IDictionary<string, string>>(h => !h.ContainsKey("traceparent"))), Times.Once);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_SkipsWhenNoBus()
     {
         var (scopeFactory, db, _) = CreateRelaySut(nameof(ExecuteAsync_SkipsWhenNoBus), withBus: false);
