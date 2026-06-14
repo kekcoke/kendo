@@ -3,6 +3,7 @@ using Kendo.Shared.ErrorHandling;
 using Kendo.Shared.Http;
 using Kendo.Shared.Messaging;
 using Kendo.Shared.Observability;
+using Kendo.Shared.GracefulShutdown;
 using Kendo.Shared.Resilience;
 using Kendo.UserService.Data;
 using Kendo.Worker;
@@ -36,6 +37,7 @@ builder.Services.AddKendoObservability(builder.Configuration, "kendo-worker");
 builder.Services.AddKendoDistributedCache(builder.Configuration);
 builder.Services.AddKendoErrorHandling();
 builder.Services.AddKendoRebus(builder.Configuration, "consumer");
+builder.Services.AddKendoGracefulShutdown(builder.Configuration);
 
 // Register Rebus handlers from the Worker assembly
 builder.Services.AddTransient<IHandleMessages<UserCreatedEvent>, UserCreatedEventHandler>();
@@ -57,6 +59,7 @@ builder.Services.AddHostedService<DlqDepthMonitor>();
 
 var app = builder.Build();
 
+app.UseMiddleware<GracefulShutdownMiddleware>();
 app.UseKendoErrorHandling();
 app.UseKendoReplicaIdentity();
 
