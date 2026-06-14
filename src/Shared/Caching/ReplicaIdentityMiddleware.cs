@@ -24,14 +24,10 @@ public class ReplicaIdentityMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        context.Response.OnStarting(() =>
+        if (!context.Response.Headers.ContainsKey("X-Kendo-Replica"))
         {
-            if (!context.Response.Headers.ContainsKey("X-Kendo-Replica"))
-            {
-                context.Response.Headers["X-Kendo-Replica"] = _replicaId;
-            }
-            return Task.CompletedTask;
-        });
+            context.Response.Headers["X-Kendo-Replica"] = _replicaId;
+        }
 
         await _next(context);
     }
