@@ -77,8 +77,8 @@
 | `Message Consumer` | Worker Service handler, idempotency key enforced per message type | ✅ |
 | `Dead Letter Queue Consumer` | DLQ handler, alert-on-threshold, structured log on every receipt | ✅ |
 | `Transactional Outbox` | EF Core outbox table + relay hosted service; atomic publish | ✅ |
-| `Trace Correlation` | `traceparent` header propagated across Service Bus messages | ~ |
-| *(All Phase 01 components)* | Inherited and still passing all Phase 01 acceptance criteria | ~ |
+| `Trace Correlation` | `traceparent` header propagated across Service Bus messages | ✅ |
+| *(All Phase 01 components)* | Inherited and still passing all Phase 01 acceptance criteria | ✅ |
 
 ---
 

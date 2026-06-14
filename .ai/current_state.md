@@ -1,18 +1,18 @@
 # Infraspekt — Current State
 > **Live checkpoint.** Updated by the Orchestrator at the end of every phase.  
 > Rule: never truncate history. Append only — except `## Last Session Summary` and `## Active Infrastructure Snapshot` (full replacements).  
-> Last updated: 2026-06-13 (Day 10)
+> Last updated: 2026-06-13 (Day 11)
 
 ---
 
 ## Session Variables
 
 ```yaml
-current_day: 10
+current_day: 11
 current_phase: 0        # 0=Init · 0b=Bootstrap · 1=Architect · 2=Dev+QA · 4=DevOps · 4b=Review · 5=State Update
 branch_base: develop
 feature_branch: ~       # resolved in Phase 1 from {{SLUG}}
-phase_plan: "02"        # platform_roadmap.md phase reference
+phase_plan: "03"        # platform_roadmap.md phase reference
 ```
 
 ---
@@ -20,9 +20,9 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* M2.5 — Transactional Outbox pattern: `OutboxMessage` entity + filtered/uniqueness indexes in `AppDbContext`; `KendoMessageSerializer` for JSON round-trips; `OutboxRelayService` background relay polls pending messages (configurable polling/backoff/retries); `OutboxRepository` writes outbox records atomically with user creation; `UsersController` refactored to use outbox instead of direct `IBus.Send()`.
-* 62/62 unit tests passing (47 existing + 15 new outbox tests); PR #11 squash-merged into `develop`.
-* Next: M2.6 — `traceparent` propagation across producer and consumer. Phase 02 continues. Carry-forward: M2.6.
+* M2.6 — Async observability: `OutboxMessage.TraceContext` column capturing ambient `Activity.Current?.Id` at write time; `OutboxRelayService` passes `traceparent` as Rebus message header; `UserCreatedEventHandler.StartTraceActivity()` extracts header and creates child `Activity` linked to producer trace; EF migration `AddTraceContext`.
+* 94/94 unit tests passing (77 existing + 17 new traceparent tests); PR #12 squash-merged into `develop`.
+* Phase 02 is complete — all milestones M2.1–M2.6 delivered. Next: Phase 03 — High Availability & Chaos Testing.
 
 ---
 
@@ -111,6 +111,21 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 
 ---
 
+## Phase Outputs — Day 11
+> Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
+
+| Phase | Artifact | Status |
+|---|---|---|
+| 0 | State initialized, variables resolved → M2.6 Traceparent propagation | ✅ |
+| 0b | *Skipped* (repo has prior commits) | ✅ |
+| 1 | `docs/architecture/day_11_spec.md` | ✅ |
+| 2 | Commit log — 4/4 units committed, zero halted — feature branch on `origin` | ✅ |
+| 4 | `ops/Dockerfile` milestone label · `ops/runbooks/day_11_runbook.md` | ✅ |
+| 4b | `docs/architecture/day_11_review_report.md` + PR #12 merged to `develop` | ✅ |
+| 5 | State update, roadmap update, changelog, validation | ✅ |
+
+---
+
 ## Phase Outputs — Day 09
 > Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
 
@@ -146,7 +161,7 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 ## Carry-Forward Items
 > Open blockers, homework, and unresolved decisions. Remove when resolved; append when new ones arise.
 
-- M2.6 — `traceparent` propagation across producer and consumer *(deferred from Day 10, target: next Phase 02 session)*
+- (none — M2.6 was deferred from Day 10 but resolved in Day 11; Phase 02 complete.)
 
 ---
 
@@ -165,6 +180,7 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 | 08 | Background consumer (M2.3) | `UserCreatedEventHandler`, `IdempotencyRecords` table, idempotency enforcement, crash recovery, 7 new handler tests, runbook | PR #9 merged to develop | ✅ |
 | 09 | DLQ consumer & alerting (M2.4) | `DeadLetteredMessage` + `KendoRebusDlqConfiguration` in Shared; `DeadLetterHandler`, `DlqDepthMonitor`, `DlqRecord` in Worker; 11 new tests, runbook | PR #10 merged to develop | ✅ |
 | 10 | Transactional Outbox (M2.5) | `OutboxMessage` entity + filtered index + unique index; `KendoMessageSerializer`; `OutboxRelayService` BackgroundService; `OutboxRepository`; UsersController refactored; EF migration; 15 new tests | PR #11 merged to develop | ✅ |
+| 11 | Async observability: traceparent propagation (M2.6) | `OutboxMessage.TraceContext` column; ambient `Activity.Current?.Id` capture; `traceparent` Rebus header; child Activity in Worker handler; EF migration; 17 new tests | PR #12 merged to develop | ✅ |
 
 ---
 
@@ -195,9 +211,9 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 * **Database:** PostgreSQL 16 + pgvector (`pgvector/pgvector:pg16`), `kendo_users` DB, `vector` extension enabled via EF Core migration
 * **Messaging:** Rebus registered with Azure Service Bus transport — Gateway + UserService in producer mode (one-way client), Worker in consumer mode (polls `kendo-events`, 3 workers). Graceful skip when `Rebus__ConnectionString` is missing (local dev).
 * **Idempotency:** `IdempotencyRecords` table (WorkerDbContext) tracks message processing status (Processing/Completed/Failed). MessageId PK enforces uniqueness. Crash recovery re-processes messages left in Processing state. All handlers wrap DB ops in transactions.
-* **Branches:** `main` (scaffolding), `develop` (PR #11 squash-merged — Day 10) — both on `origin`
+* **Branches:** `main` (scaffolding), `develop` (PR #12 squash-merged — Day 11) — both on `origin`
 * **Pipelines:** CI pipeline active (`.github/workflows/ci.yml`) — build → unit tests → data integration tests (with pgvector service container) → resilience tests → **messaging tests** → docker compose health verification. CI `Wait for healthy` step hardened to wait for all 4 services.
-* **Tests:** 62/62 unit tests passing (8 health-check + 4 data integration + 13 resilience + 4 observability + 10 ProblemDetails middleware + 4 Messaging registration + 7 Worker handler idempotency + 4 DeadLetterHandler + 7 DlqDepthMonitor + 6 OutboxSerializer + 4 OutboxRepository + 6 OutboxRelayService + 4 UsersController)
+* **Tests:** 94/94 unit tests passing (8 health-check + 4 data integration + 13 resilience + 4 observability + 10 ProblemDetails middleware + 4 Messaging registration + 7 Worker handler idempotency + 4 DeadLetterHandler + 7 DlqDepthMonitor + 6 OutboxSerializer + 5 OutboxRepository + 7 OutboxRelayService + 4 UsersController + 6 OutboxRepository trace + 3 OutboxRelayService trace + 4 UserCreatedEventHandler trace)
 * **Observability:** All 3 services emit OpenTelemetry traces to console exporter; trace IDs correlated in all ILogger log lines; Polly callbacks emit structured logs with trace context; error responses include trace ID in RFC 7807 `traceId` field
 * **Local:** API instances: 3 (Gateway, UserService, Worker), Postgres: 1 (Docker), RabbitMQ: 1 (infrastructure, not yet consumed), Redis: 1 (infrastructure)
 
@@ -225,3 +241,4 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 * **DLQ Consumer — DeadLetterQueue sub-queue:** ASB auto-creates `kendo-events/$DeadLetterQueue` for the main queue. `KendoRebusDlqConfiguration.AddKendoRebusDlqConsumer()` registers a separate Rebus consumer on this sub-queue with `NumberOfWorkers: 1`. The consumer is disabled by default (`Rebus__DlqConsumerEnabled: false`). `DeadLetterHandler` is fail-safe — acknowledges messages even if persistence fails, preventing re-delivery loops. *(Day 09)*
 * **DLQ Depth Monitoring — Polling Monitor:** `DlqDepthMonitor` BackgroundService polls ASB management API at configurable interval (default 60s). Alert fires via `LogLevel.Error` when depth exceeds configurable threshold (default 5). Rate-limited dedup prevents alert spam. *(Day 09)*
 * **Transactional Outbox — OutboxMessages table:** `OutboxMessage` entity in UserService's `AppDbContext` with filtered index `IX_OutboxMessages_Unprocessed` (WHERE ProcessedAt IS NULL) for relay polling and unique index `IX_OutboxMessages_MessageId` for deduplication. `OutboxRelayService` BackgroundService polls pending messages, publishes via Rebus `IBus.Send()`, and marks as processed. RetryCount + LastError fields enable failure tracking up to configurable MaxRetries (default: 5). *(Day 10)*
+* **Traceparent Correlation — Cross-process trace linking:** `OutboxMessage.TraceContext` column (nullable text) captures `Activity.Current?.Id` at outbox write time. `OutboxRelayService` forwards it as `traceparent` Rebus message header. `UserCreatedEventHandler.StartTraceActivity()` extracts header and creates child `Activity` linked to the producer trace. Defensive parsing — malformed headers fall back to fresh trace. Best-effort correlation design; null TraceContext handled gracefully. *(Day 11)*
