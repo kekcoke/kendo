@@ -111,11 +111,23 @@ jobs:
           curl -fsS http://localhost:5000/health/live
           echo ""
           echo "=== POST through NGINX to UserService ==="
-          curl -s -o /dev/null -w "%{http_code}" -X POST \
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
             http://localhost:5000/api/users \
             -H 'Content-Type: application/json' \
-            -d '{"email":"ci@test.com","displayName":"CI Test"}' \
-            | grep -q 202 && echo " ✓ 202 Accepted" || (echo " ✗ unexpected status" && exit 1)
+            -d '{"email":"ci@test.com","displayName":"CI Test"}')
+          echo "Status: $STATUS"
+          if [ "$STATUS" = "202" ]; then
+            echo " ✓ 202 Accepted"
+          else
+            echo " ✗ unexpected status: $STATUS"
+            # Capture response body for debugging
+            curl -s -X POST \
+              http://localhost:5000/api/users \
+              -H 'Content-Type: application/json' \
+              -d '{"email":"ci-debug@test.com","displayName":"Debug"}' \
+              || true
+            exit 1
+          fi
 
       - name: Verify traffic distribution
         run: |
