@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using Kendo.Shared.Messaging;
+using Rebus.Pipeline;
 using Kendo.UserService.Data;
 using Kendo.UserService.Models;
 using Kendo.Worker.Data;
@@ -38,8 +40,40 @@ public class UserCreatedEventHandler : IHandleMessages<UserCreatedEvent>
         _logger = logger;
     }
 
+    private static Activity? StartTraceActivity()
+    {
+        var context = MessageContext.Current;
+        if (context?.Headers.TryGetValue("traceparent", out var traceParent) != true
+            || string.IsNullOrWhiteSpace(traceParent))
+        {
+            return null;
+        }
+
+        try
+        {
+            var activity = new Activity("UserCreatedEvent.Process");
+            activity.SetParentId(traceParent);
+            activity.Start();
+            return activity;
+        }
+        catch
+        {
+            // Malformed traceparent — fall back to fresh trace
+            return null;
+        }
+    }
+
     public async Task Handle(UserCreatedEvent message)
     {
+        // Extract traceparent from Rebus headers and create a child Activity
+        using var traceActivity = StartTraceActivity();
+        if (traceActivity is not null)
+        {
+            _logger.LogInformation(
+                "Trace correlation: traceId={TraceId}, parentSpanId={ParentSpanId}",
+                traceActivity.TraceId, traceActivity.ParentSpanId);
+        }
+
         var handlerName = "UserCreated";
         _logger.LogInformation(
             "Processing UserCreatedEvent: MessageId={MessageId}, UserId={UserId}",
