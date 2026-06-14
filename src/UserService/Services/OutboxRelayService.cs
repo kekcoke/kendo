@@ -61,7 +61,7 @@ public class OutboxRelayService : BackgroundService
         }
     }
 
-    private async Task ProcessBatchAsync(CancellationToken stoppingToken)
+    public async Task ProcessBatchAsync(CancellationToken stoppingToken)
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
