@@ -93,6 +93,52 @@ public class OutboxRepositoryTests
     }
 
     [Fact]
+    public async Task AddAsync_StoresTraceContext_WhenActivityExists()
+    {
+        var (repo, db) = CreateSut(nameof(AddAsync_StoresTraceContext_WhenActivityExists));
+
+        // Create an ambient Activity
+        var testActivity = new System.Diagnostics.Activity("TestOperation");
+        testActivity.Start();
+
+        var message = new UserCreatedEvent
+        {
+            UserId = Guid.NewGuid(),
+            Email = "trace@example.com",
+            DisplayName = "Trace Test"
+        };
+
+        await repo.AddAsync(message);
+
+        testActivity.Stop();
+
+        var record = await db.OutboxMessages.FirstAsync(m => m.MessageId == message.MessageId);
+        Assert.NotNull(record.TraceContext);
+        Assert.Equal(testActivity.Id, record.TraceContext);
+    }
+
+    [Fact]
+    public async Task AddAsync_TraceContextNull_WhenNoActivity()
+    {
+        var (repo, db) = CreateSut(nameof(AddAsync_TraceContextNull_WhenNoActivity));
+
+        // Ensure no ambient Activity
+        System.Diagnostics.Activity.Current = null;
+
+        var message = new UserCreatedEvent
+        {
+            UserId = Guid.NewGuid(),
+            Email = "notrace@example.com",
+            DisplayName = "No Trace"
+        };
+
+        await repo.AddAsync(message);
+
+        var record = await db.OutboxMessages.FirstAsync(m => m.MessageId == message.MessageId);
+        Assert.Null(record.TraceContext);
+    }
+
+    [Fact]
     public async Task AddAsync_SerializesPayloadCorrectly()
     {
         var (repo, db) = CreateSut(nameof(AddAsync_SerializesPayloadCorrectly));

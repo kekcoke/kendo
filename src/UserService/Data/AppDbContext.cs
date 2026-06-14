@@ -40,6 +40,7 @@ public class AppDbContext : DbContext
             entity.Property(e => e.ProcessedAt);
             entity.Property(e => e.RetryCount).HasDefaultValue(0);
             entity.Property(e => e.LastError).HasMaxLength(2000);
+            entity.Property(e => e.TraceContext).HasMaxLength(100);
 
             // Filtered index for efficient relay polling
             entity.HasIndex(e => e.CreatedAt)

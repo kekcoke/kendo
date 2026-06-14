@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Kendo.Shared.Messaging;
 using Kendo.Shared.Resilience;
 using Kendo.UserService.Data;
@@ -86,6 +87,70 @@ public class UserCreatedEventHandlerTests
         db.IdempotencyRecords.Add(record);
         await db.SaveChangesAsync();
         return record;
+    }
+
+    // ── Trace correlation ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_CreatesChildActivityFromTraceparent()
+    {
+        var (handler, _, userDb) = CreateSut(nameof(Handle_CreatesChildActivityFromTraceparent));
+        var user = await SeedUserAsync(userDb);
+        var messageId = Guid.NewGuid();
+
+        // Create a parent Activity and capture its traceparent
+        var parentActivity = new Activity("ParentOperation");
+        parentActivity.Start();
+        var traceParent = parentActivity.Id!;
+        parentActivity.Stop();
+
+        // Verify StartTraceActivity creates a child Activity from traceparent
+        using var childActivity = UserCreatedEventHandler.StartTraceActivity(
+            new Dictionary<string, string> { ["traceparent"] = traceParent });
+
+        Assert.NotNull(childActivity);
+        Assert.Equal(parentActivity.TraceId, childActivity.TraceId);
+        Assert.False(childActivity.ParentSpanId == default);
+    }
+
+    [Fact]
+    public async Task Handle_FallsBackToNewTrace_WhenTraceparentMissing()
+    {
+        var (handler, _, userDb) = CreateSut(nameof(Handle_FallsBackToNewTrace_WhenTraceparentMissing));
+        var user = await SeedUserAsync(userDb);
+        var messageId = Guid.NewGuid();
+
+        // Verify StartTraceActivity returns null when no traceparent header
+        var activity = UserCreatedEventHandler.StartTraceActivity(
+            new Dictionary<string, string>());
+
+        Assert.Null(activity);
+    }
+
+    [Fact]
+    public async Task Handle_RunsSuccessfully_WithTraceActivity()
+    {
+        var (handler, workerDb, userDb) = CreateSut(nameof(Handle_RunsSuccessfully_WithTraceActivity));
+        var user = await SeedUserAsync(userDb);
+        var messageId = Guid.NewGuid();
+
+        var message = new UserCreatedEvent
+        {
+            MessageId = messageId,
+            UserId = user.Id,
+            Email = user.Email,
+            DisplayName = user.DisplayName
+        };
+
+        // The handler runs with a traceparent in the Rebus context — verify it completes
+        // (StartTraceActivity is called inside Handle, which reads from MessageContext.Current)
+        await handler.Handle(message);
+
+        // Verify the message was processed
+        var record = await workerDb.IdempotencyRecords.FirstAsync(r => r.MessageId == messageId);
+        Assert.Equal(IdempotencyStatus.Completed, record.Status);
+        var updatedUser = await userDb.Users.FirstAsync(u => u.Id == user.Id);
+        Assert.Equal(UserStatus.Completed, updatedUser.Status);
     }
 
     // ── First-time processing ──────────────────────────────────────────

@@ -40,10 +40,16 @@ public class UserCreatedEventHandler : IHandleMessages<UserCreatedEvent>
         _logger = logger;
     }
 
-    private static Activity? StartTraceActivity()
+    /// <summary>
+    /// Starts a child Activity linked to the producer's trace by extracting the
+    /// <c>traceparent</c> header from the current Rebus message context.
+    /// Returns null when no traceparent header is present (creates a fresh trace).
+    /// </summary>
+    public static Activity? StartTraceActivity(Dictionary<string, string>? headers = null)
     {
-        var context = MessageContext.Current;
-        if (context?.Headers.TryGetValue("traceparent", out var traceParent) != true
+        headers ??= MessageContext.Current?.Headers;
+
+        if (headers?.TryGetValue("traceparent", out var traceParent) != true
             || string.IsNullOrWhiteSpace(traceParent))
         {
             return null;
