@@ -18,8 +18,8 @@ public static class GracefulShutdownServiceCollectionExtensions
         // Register singleton tracker
         services.AddSingleton<RequestTracker>();
 
-        // Register middleware
-        services.AddSingleton<GracefulShutdownMiddleware>();
+        // Middleware is NOT registered as a service — ASP.NET Core's UseMiddleware<T>()
+        // provides RequestDelegate at pipeline construction time.
 
         // Register hosted service that triggers drain on SIGTERM
         services.AddHostedService(sp =>
