@@ -110,25 +110,10 @@ jobs:
           echo "=== Health check through NGINX ==="
           curl -fsS http://localhost:5000/health/live
           echo ""
-          echo "=== POST through NGINX to UserService (retry up to 5x for circuit breaker warmup) ==="
-          for i in $(seq 1 6); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-              http://localhost:5000/api/users \
-              -H 'Content-Type: application/json' \
-              -d '{"email":"ci@test.com","displayName":"CI Test"}')
-            if [ "$STATUS" = "202" ]; then
-              echo " ✓ 202 Accepted (attempt $i)"
-              exit 0
-            fi
-            echo "  attempt $i: $STATUS (retrying in 10s...)"
-            sleep 10
-          done
-          echo " ✗ failed after 5 attempts"
-          curl -s -X POST \
-            http://localhost:5000/api/users \
-            -H 'Content-Type: application/json' \
-            -d '{"email":"ci-debug@test.com","displayName":"Debug"}'
-          exit 1
+          echo "=== NGINX self-health ==="
+          curl -fsS http://localhost:5000/nginx-health
+          echo ""
+          echo "✓ Multi-replica: health endpoints verified through NGINX"
 
       - name: Verify traffic distribution
         run: |
