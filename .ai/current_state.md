@@ -1,7 +1,7 @@
 # Infraspekt — Current State
 > **Live checkpoint.** Updated by the Orchestrator at the end of every phase.  
 > Rule: never truncate history. Append only — except `## Last Session Summary` and `## Active Infrastructure Snapshot` (full replacements).  
-> Last updated: 2026-06-14 (Day 12)
+> Last updated: 2026-06-14 (Day 14)
 
 ---
 
@@ -20,9 +20,8 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* **M3.3 complete** — Chaos test suite added: xUnit `ChaosTestFixture` + bash scripts cover DB downtime (circuit breaker fallback, no cascade), service crash (NGINX re-route), and network partition (outbox + async path). All 3 scenarios produce structured PASS/FAIL/SKIP reports.
-* 76/76 unit tests still passing (no regression). New `chaos-test` CI job runs after `docker-compose`, invokes `run_all.sh` on multi-replica stack. PR #16 squash-merged into `develop`.
-* Next: **M3.4** — Rate limiting & load shedding: `429 + Retry-After` at Gateway, `503` RFC 7807 under extreme concurrency.
+* **M3.4 complete** — Rate limiting (fixed-window, 429 + Retry-After) and load shedding (concurrency limiter, 503 RFC 7807) enforced at Gateway via new `Kendo.Shared.RateLimiting` module. Health endpoints bypassed. 84/84 unit tests passing (8 new). PR #17 squash-merged into `develop`.
+* Next: **M3.5** — Graceful shutdown: SIGTERM handler + drain timeout on all services.
 
 ---
 
@@ -155,6 +154,21 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 
 ---
 
+## Phase Outputs — Day 14
+> Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
+
+| Phase | Artifact | Status |
+|---|---|---|
+| 0 | State initialized, variables resolved → M3.4 Rate limiting & shedding | ✅ |
+| 0b | *Skipped* (repo has prior commits) | ✅ |
+| 1 | `docs/architecture/day_14_spec.md` | ✅ |
+| 2 | Commit log — 4/4 units committed, zero halted — feature branch on `origin` | ✅ |
+| 4 | `ops/runbooks/day_14_runbook.md` | ✅ |
+| 4b | `docs/architecture/day_14_review_report.md` + PR #17 merged to `develop` | ✅ |
+| 5 | State update, roadmap update, changelog, validation | ✅ |
+
+---
+
 ## Incomplete Tasks
 > Tasks started this day but halted (lint/test failure, spec ambiguity, reviewer FAIL routing).  
 > **Must be empty before Day N+1 can begin.** Populated by Reviewer FAIL verdict or commit-gate halt.
@@ -198,6 +212,7 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 | 12 | Reverse proxy load balancer (M3.1) | `ops/nginx/nginx.conf`, `docker-compose.yml` NGINX + `expose:`, multi-replica CI, 5 infra tests, runbook | PR #14 squashed to `develop` | ✅ |
 | 12 | Stateless validation & Redis (M3.2) | Redis distributed cache, replica identity middleware, X-Kendo-Replica header, sticky-session disable, 7 new tests (76 total) | PR #15 squashed to `develop` | ✅ |
 | 13 | Chaos test suite (M3.3) | xUnit chaos tests (DB downtime, service crash, network partition), bash scripts, chaos-test CI job, runbook, 3 new test files | PR #16 merged to `develop` | ✅ |
+| 14 | Rate limiting & load shedding (M3.4) | RateLimitingMiddleware (429 + Retry-After), LoadSheddingMiddleware (503 RFC 7807), 8 new tests (84 total), runbook | PR #17 squash-merged to `develop` | ✅ |
 
 ---
 
@@ -226,8 +241,8 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 * **Services:** Gateway (port 5000 behind NGINX), UserService (port 5001 expose), Worker (port 5002 expose), PostgreSQL (port 5432), Redis (port 6379), NGINX (port 80 internal, 5000 host) — all containerized
 * **Docker Compose:** All 6 services with health checks; multi-replica (3 each) scaling for chaos testing
 * **Chaos Test Suite:** 3 xUnit tests (`Category=Chaos`) with Docker CLI integration. 3 bash scripts in `scripts/chaos/`. CI job `chaos-test` runs after `docker-compose`, invokes `run_all.sh` on multi-replica stack, uploads structured results artifact
-* **Tests:** 76/76 unit tests passing (existing suite). 3 new chaos test files added (Docker-dependent, auto-skip when unavailable)
-* **Branches:** `develop` (PR #16 squash-merged — Day 13) — on `origin`
+* **Tests:** 84/84 unit tests passing (76 existing + 8 new rate limiting/load shedding)
+* **Branches:** `develop` (PR #17 squash-merged — Day 14) — on `origin`
 * **Pipelines:** CI pipeline active: build-and-test -> docker-compose -> chaos-test (new)
 
 * **Docker Compose:** All 6 services with health checks; PostgreSQL (5s interval), app services (10s interval), Redis (5s interval), NGINX (10s interval, wget self-health); `depends_on` postgres healthy → userservice
@@ -236,7 +251,7 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 * **Idempotency:** `IdempotencyRecords` table (WorkerDbContext) tracks message processing status (Processing/Completed/Failed). MessageId PK enforces uniqueness. Crash recovery re-processes messages left in Processing state. All handlers wrap DB ops in transactions.
 * **Branches:** `main` (scaffolding), `develop` (PR #15 squash-merged — Day 12) — both on `origin`
 * **Pipelines:** CI pipeline active (`.github/workflows/ci.yml`) — build → unit tests → data integration tests (with pgvector + Redis service containers) → resilience tests → messaging tests → docker compose health verification (6 single-replica, 12 multi-replica) → replica header verification → traffic distribution check.
-* **Tests:** 76/76 unit tests passing (8 health-check + 4 data integration + 13 resilience + 4 observability + 10 ProblemDetails middleware + 4 Messaging registration + 7 Worker handler idempotency + 4 DeadLetterHandler + 7 DlqDepthMonitor + 6 OutboxSerializer + 5 OutboxRepository + 7 OutboxRelayService + 4 UsersController + 6 OutboxRepository trace + 3 OutboxRelayService trace + 4 UserCreatedEventHandler trace)
+* **Tests:** 84/84 unit tests passing (8 health-check + 4 data integration + 13 resilience + 4 observability + 10 ProblemDetails middleware + 4 Messaging registration + 7 Worker handler idempotency + 4 DeadLetterHandler + 7 DlqDepthMonitor + 6 OutboxSerializer + 5 OutboxRepository + 7 OutboxRelayService + 4 UsersController + 6 OutboxRepository trace + 3 OutboxRelayService trace + 4 UserCreatedEventHandler trace + 4 RateLimiter + 4 LoadShedding)
 * **Observability:** All 3 services emit OpenTelemetry traces to console exporter; trace IDs correlated in all ILogger log lines; Polly callbacks emit structured logs with trace context; error responses include trace ID in RFC 7807 `traceId` field
 * **Local:** API instances: 3 (Gateway, UserService, Worker), Postgres: 1 (Docker), RabbitMQ: 1 (infrastructure, not yet consumed), Redis: 1 (Docker, wired, best-effort cache)
 
@@ -268,3 +283,5 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 * **Distributed Cache — Redis / In-Memory Fallback:** `AddKendoDistributedCache()` extension in `Kendo.Shared.Caching` registers `StackExchangeRedis` when `Redis__ConnectionString` is set, falls back to `AddDistributedMemoryCache()` otherwise. Best-effort — cache miss on Redis returns null; no cascading failure. *(Day 12)*
 * **Replica Identity — X-Kendo-Replica Header:** `ReplicaIdentityMiddleware` reads Docker `$HOSTNAME` (fallback `Environment.MachineName` → "unknown") and appends `X-Kendo-Replica` header to all HTTP responses. NGINX passes through via `proxy_set_header X-Kendo-Replica $upstream_http_x_kendo_replica;`. *(Day 12)*
 * **Redis in Docker Compose:** `redis:7-alpine` with `redis-cli ping` health check. All 3 services receive `Redis__ConnectionString=redis:6379` env var. CI includes Redis service container. *(Day 12)*
+* **Rate Limiting — Fixed-Window (Gateway):** `FixedWindowRateLimiter` registered as singleton in DI via `AddKendoRateLimiting()`. `RateLimitingMiddleware` enforces permit limit per time window at Gateway. Health endpoints bypassed. `System.Threading.RateLimiting` primitives used directly (no ASP.NET middleware package dependency). *(Day 14)*
+* **Load Shedding — Concurrency Limiter (Gateway):** `ConcurrencyLimiter` registered as singleton in DI. `LoadSheddingMiddleware` returns 503 RFC 7807 under extreme concurrency. Runs before rate limiter in middleware pipeline. Health endpoints bypassed. *(Day 14)*
