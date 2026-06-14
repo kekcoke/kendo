@@ -1,3 +1,4 @@
+using Kendo.Shared.Caching;
 using Kendo.Shared.ErrorHandling;
 using Kendo.Shared.Messaging;
 using Kendo.Shared.Observability;
@@ -21,6 +22,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 
 builder.Services.AddKendoResilience(builder.Configuration);
 builder.Services.AddKendoObservability(builder.Configuration, "kendo-userservice");
+builder.Services.AddKendoDistributedCache(builder.Configuration);
 builder.Services.AddKendoErrorHandling();
 builder.Services.AddKendoRebus(builder.Configuration, "producer");
 
@@ -35,6 +37,7 @@ builder.Services.AddHostedService<OutboxRelayService>();
 var app = builder.Build();
 
 app.UseKendoErrorHandling();
+app.UseKendoReplicaIdentity();
 
 app.MapControllers();
 
