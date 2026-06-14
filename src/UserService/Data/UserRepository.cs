@@ -14,7 +14,7 @@ public class UserRepository
         _resilientDb = resilientDb;
     }
 
-    public async Task<User> CreateAsync(string email, string displayName, CancellationToken ct = default)
+    public virtual async Task<User> CreateAsync(string email, string displayName, CancellationToken ct = default)
     {
         var user = new User
         {
@@ -33,7 +33,7 @@ public class UserRepository
         return user;
     }
 
-    public async Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    public virtual async Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         return await _resilientDb.ExecuteAsync(async token =>
             await _db.Users.FirstOrDefaultAsync(u => u.Id == id, token), ct);
