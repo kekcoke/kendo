@@ -1,14 +1,14 @@
 # Infraspekt — Current State
 > **Live checkpoint.** Updated by the Orchestrator at the end of every phase.  
 > Rule: never truncate history. Append only — except `## Last Session Summary` and `## Active Infrastructure Snapshot` (full replacements).  
-> Last updated: 2026-06-13 (Day 09)
+> Last updated: 2026-06-13 (Day 10)
 
 ---
 
 ## Session Variables
 
 ```yaml
-current_day: 9
+current_day: 10
 current_phase: 0        # 0=Init · 0b=Bootstrap · 1=Architect · 2=Dev+QA · 4=DevOps · 4b=Review · 5=State Update
 branch_base: develop
 feature_branch: ~       # resolved in Phase 1 from {{SLUG}}
@@ -20,9 +20,9 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* M2.4 — Dead Letter Queue consumer and alerting: `DeadLetterHandler` consumes DLQ messages with fail-safe persistence; `DlqDepthMonitor` periodically polls ASB DLQ depth and fires `LogLevel.Error` alert when configurable threshold (default: 5) is exceeded; rate-limited alert dedup prevents log spam.
-* 47/47 unit tests passing (36 existing + 11 new DLQ tests); PR #10 squash-merged into `develop`.
-* Next: M2.5 — Transactional Outbox pattern. Phase 02 continues. Carry-forward: none.
+* M2.5 — Transactional Outbox pattern: `OutboxMessage` entity + filtered/uniqueness indexes in `AppDbContext`; `KendoMessageSerializer` for JSON round-trips; `OutboxRelayService` background relay polls pending messages (configurable polling/backoff/retries); `OutboxRepository` writes outbox records atomically with user creation; `UsersController` refactored to use outbox instead of direct `IBus.Send()`.
+* 62/62 unit tests passing (47 existing + 15 new outbox tests); PR #11 squash-merged into `develop`.
+* Next: M2.6 — `traceparent` propagation across producer and consumer. Phase 02 continues. Carry-forward: M2.6.
 
 ---
 
@@ -146,7 +146,7 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 ## Carry-Forward Items
 > Open blockers, homework, and unresolved decisions. Remove when resolved; append when new ones arise.
 
-*(none — all items resolved)*
+- M2.6 — `traceparent` propagation across producer and consumer *(deferred from Day 10, target: next Phase 02 session)*
 
 ---
 
@@ -164,6 +164,7 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 | 07 | First async endpoint (M2.2) | `UsersController` (POST 202 + GET status), `User` entity, `UserCreatedEvent`, EF migration, 9 new tests, runbook | PR #8 merged to develop | ✅ |
 | 08 | Background consumer (M2.3) | `UserCreatedEventHandler`, `IdempotencyRecords` table, idempotency enforcement, crash recovery, 7 new handler tests, runbook | PR #9 merged to develop | ✅ |
 | 09 | DLQ consumer & alerting (M2.4) | `DeadLetteredMessage` + `KendoRebusDlqConfiguration` in Shared; `DeadLetterHandler`, `DlqDepthMonitor`, `DlqRecord` in Worker; 11 new tests, runbook | PR #10 merged to develop | ✅ |
+| 10 | Transactional Outbox (M2.5) | `OutboxMessage` entity + filtered index + unique index; `KendoMessageSerializer`; `OutboxRelayService` BackgroundService; `OutboxRepository`; UsersController refactored; EF migration; 15 new tests | PR #11 merged to develop | ✅ |
 
 ---
 
@@ -182,6 +183,7 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 | IdempotencyRecords | DB table | Tracks processed messages by MessageId PK; enforces idempotency, enables crash recovery | Day 08 | Worker (UserCreatedEventHandler) |
 | DlqRecords | DB table | Tracks dead-lettered messages from ASB DLQ; audit trail for manual recovery | Day 09 | Worker (DeadLetterHandler) |
 | Dead Letter Queue | ASB DLQ (auto) | `kendo-events/$DeadLetterQueue` — auto-created by ASB for the main queue | Day 09 | Worker (DeadLetterHandler, DlqDepthMonitor) |
+| OutboxMessages | DB table | Transactional outbox table for atomic event publishing; filtered index for unprocessed messages, unique index on MessageId | Day 10 | UserService (UsersController, OutboxRelayService) |
 
 ---
 
@@ -193,9 +195,9 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 * **Database:** PostgreSQL 16 + pgvector (`pgvector/pgvector:pg16`), `kendo_users` DB, `vector` extension enabled via EF Core migration
 * **Messaging:** Rebus registered with Azure Service Bus transport — Gateway + UserService in producer mode (one-way client), Worker in consumer mode (polls `kendo-events`, 3 workers). Graceful skip when `Rebus__ConnectionString` is missing (local dev).
 * **Idempotency:** `IdempotencyRecords` table (WorkerDbContext) tracks message processing status (Processing/Completed/Failed). MessageId PK enforces uniqueness. Crash recovery re-processes messages left in Processing state. All handlers wrap DB ops in transactions.
-* **Branches:** `main` (scaffolding), `develop` (PR #10 squash-merged — Day 09) — both on `origin`
+* **Branches:** `main` (scaffolding), `develop` (PR #11 squash-merged — Day 10) — both on `origin`
 * **Pipelines:** CI pipeline active (`.github/workflows/ci.yml`) — build → unit tests → data integration tests (with pgvector service container) → resilience tests → **messaging tests** → docker compose health verification. CI `Wait for healthy` step hardened to wait for all 4 services.
-* **Tests:** 47/47 unit tests passing (8 health-check + 4 data integration + 13 resilience + 4 observability + 10 ProblemDetails middleware + 4 Messaging registration + 7 Worker handler idempotency + 4 DeadLetterHandler + 7 DlqDepthMonitor)
+* **Tests:** 62/62 unit tests passing (8 health-check + 4 data integration + 13 resilience + 4 observability + 10 ProblemDetails middleware + 4 Messaging registration + 7 Worker handler idempotency + 4 DeadLetterHandler + 7 DlqDepthMonitor + 6 OutboxSerializer + 4 OutboxRepository + 6 OutboxRelayService + 4 UsersController)
 * **Observability:** All 3 services emit OpenTelemetry traces to console exporter; trace IDs correlated in all ILogger log lines; Polly callbacks emit structured logs with trace context; error responses include trace ID in RFC 7807 `traceId` field
 * **Local:** API instances: 3 (Gateway, UserService, Worker), Postgres: 1 (Docker), RabbitMQ: 1 (infrastructure, not yet consumed), Redis: 1 (infrastructure)
 
@@ -222,3 +224,4 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 * **Idempotency — MessageId Key:** `KendoMessage.MessageId` used as idempotency key. `IdempotencyRecords` table in WorkerDbContext tracks Processing/Completed/Failed states. MessageId PK enforces unique constraint. Crash recovery re-processes Processing-state messages. *(Day 08)*
 * **DLQ Consumer — DeadLetterQueue sub-queue:** ASB auto-creates `kendo-events/$DeadLetterQueue` for the main queue. `KendoRebusDlqConfiguration.AddKendoRebusDlqConsumer()` registers a separate Rebus consumer on this sub-queue with `NumberOfWorkers: 1`. The consumer is disabled by default (`Rebus__DlqConsumerEnabled: false`). `DeadLetterHandler` is fail-safe — acknowledges messages even if persistence fails, preventing re-delivery loops. *(Day 09)*
 * **DLQ Depth Monitoring — Polling Monitor:** `DlqDepthMonitor` BackgroundService polls ASB management API at configurable interval (default 60s). Alert fires via `LogLevel.Error` when depth exceeds configurable threshold (default 5). Rate-limited dedup prevents alert spam. *(Day 09)*
+* **Transactional Outbox — OutboxMessages table:** `OutboxMessage` entity in UserService's `AppDbContext` with filtered index `IX_OutboxMessages_Unprocessed` (WHERE ProcessedAt IS NULL) for relay polling and unique index `IX_OutboxMessages_MessageId` for deduplication. `OutboxRelayService` BackgroundService polls pending messages, publishes via Rebus `IBus.Send()`, and marks as processed. RetryCount + LastError fields enable failure tracking up to configurable MaxRetries (default: 5). *(Day 10)*
