@@ -20,9 +20,9 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* M2.1 Rebus + Azure Service Bus wired across all 3 services: `KendoRebusConfiguration.AddKendoRebus()` extension with producer/consumer modes, `KendoMessage` base record, graceful-skip for local dev without ASB connection string.
-* 43/43 xUnit tests passing (39 existing + 4 new Messaging registration tests); Gateway + UserService producers, Worker consumer; CI updated with `Category=Messaging` step; CI `Wait for healthy` race condition fixed.
-* Next: M2.2 — First async endpoint (`202 Accepted`). Phase 02 continues. Carry-forward: none. CI hotfix for `Wait for healthy` applied (all 4 services, not just first).
+* M2.2 — First async endpoint (`POST /api/users` returning 202 Accepted) implemented in UserService: `UsersController`, `UserRepository`, `User` entity with status tracking, `UserCreatedEvent` domain message, EF Core migration adding Users table.
+* 27/27 unit tests passing (18 existing + 9 new for controller + repository); PR #8 squash-merged into `develop`.
+* Next: M2.3 — Background consumer with idempotency key enforcement. Phase 02 continues. Carry-forward: none.
 
 ---
 
@@ -146,6 +146,7 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 | 04 | Observability foundation | OpenTelemetry console exporter, trace-ID correlation, structured Polly logging, CI PostgreSQL fix, 29 tests (4 observability) | PR #5 merged to develop | ✅ |
 | 05 | RFC 7807 Problem Details | `KendoProblemDetails` DTO + `ProblemDetailsMiddleware` in Kendo.Shared, wired into all 3 services, 10 new tests, Dockerfile context fix | PR #6 merged to develop | ✅ |
 | 06 | Rebus + Azure Service Bus wired | `KendoMessage` + `KendoRebusConfiguration` in Kendo.Shared; Gateway + UserService producers, Worker consumer; 4 Messaging tests; CI fix (Wait for all 4 healthy) | PR #7 merged to develop | ✅ |
+| 07 | First async endpoint (M2.2) | `UsersController` (POST 202 + GET status), `User` entity, `UserCreatedEvent`, EF migration, 9 new tests, runbook | PR #8 merged to develop | ✅ |
 
 ---
 
