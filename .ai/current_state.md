@@ -9,7 +9,7 @@
 
 ```yaml
 current_day: 12
-current_phase: 2        # 0=Init · 0b=Bootstrap · 1=Architect · 2=Dev+QA · 4=DevOps · 4b=Review · 5=State Update
+current_phase: 4        # 0=Init · 0b=Bootstrap · 1=Architect · 2=Dev+QA · 4=DevOps · 4b=Review · 5=State Update
 branch_base: develop
 feature_branch: ~       # resolved in Phase 1 from {{SLUG}}
 phase_plan: "03"        # platform_roadmap.md phase reference
@@ -134,7 +134,7 @@ phase_plan: "03"        # platform_roadmap.md phase reference
 | 0 | State initialized, variables resolved → M3.2 Stateless validation | ✅ |
 | 0b | *Skipped* (repo has prior commits) | ✅ |
 | 1 | `docs/architecture/day_12_spec.md` | ✅ |
-| 2 | Commit log — zero halted units — feature branch on `origin` | ~ |
+| 2 | Commit log — 6/6 units committed, zero halted — feature branch on `origin` | ✅ |
 | 4 | `ops/Dockerfile` milestone label · `ops/runbooks/day_12_runbook.md` | ~ |
 | 4b | Review report + PR merged to `develop` | ~ |
 | 5 | State update, roadmap update, changelog, validation | ~ |

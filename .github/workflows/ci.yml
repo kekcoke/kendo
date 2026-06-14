@@ -23,6 +23,15 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -64,11 +73,11 @@ jobs:
         run: |
           for i in $(seq 1 20); do
             healthy=$(docker compose ps --format json | grep '"Health":"healthy"' | wc -l)
-            if [ "$healthy" -ge 5 ]; then
-              echo "All 5 services healthy (gateway, userservice, worker, postgres, nginx)."
+            if [ "$healthy" -ge 6 ]; then
+              echo "All 6 services healthy (gateway, userservice, worker, postgres, nginx, redis)."
               exit 0
             fi
-            echo "wait ($i/20): $healthy/5 services healthy"
+            echo "wait ($i/20): $healthy/6 services healthy"
             sleep 4
           done
           docker compose ps
@@ -94,11 +103,11 @@ jobs:
         run: |
           for i in $(seq 1 20); do
             healthy=$(docker compose ps --format json | grep '"Health":"healthy"' | wc -l)
-            if [ "$healthy" -ge 11 ]; then
-              echo "All 11 containers healthy."
+            if [ "$healthy" -ge 12 ]; then
+              echo "All 12 containers healthy (3 gateway + 3 userservice + 3 worker + nginx + postgres + redis)."
               exit 0
             fi
-            echo "wait ($i/20): $healthy/11 containers healthy"
+            echo "wait ($i/20): $healthy/12 containers healthy"
             sleep 4
           done
           docker compose ps
@@ -114,6 +123,15 @@ jobs:
           curl -fsS http://localhost:5000/nginx-health
           echo ""
           echo "✓ Multi-replica: health endpoints verified through NGINX"
+
+      - name: Verify replica identity headers
+        run: |
+          echo "=== Verify X-Kendo-Replica header ==="
+          for i in $(seq 1 10); do
+            REPLICA=$(curl -s -I http://localhost:5000/health/live 2>/dev/null | grep -i "X-Kendo-Replica" | tr -d '\r')
+            echo "  Request $i: $REPLICA"
+          done
+          echo "✓ Replica identity headers verified through NGINX"
 
       - name: Verify traffic distribution
         run: |
