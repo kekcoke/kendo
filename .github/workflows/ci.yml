@@ -146,3 +146,4 @@ jobs:
 
       - name: Tear down (multi-replica)
         if: always()
+        run: docker compose down
