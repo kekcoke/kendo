@@ -3,6 +3,7 @@ using Kendo.Shared.Messaging;
 using Kendo.Shared.Observability;
 using Kendo.Shared.Resilience;
 using Kendo.UserService.Data;
+using Kendo.UserService.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -28,6 +29,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddScoped<ResilientAppDbContext>();
 builder.Services.AddScoped<UserRepository>();
+builder.Services.AddScoped<OutboxRepository>();
+builder.Services.AddHostedService<OutboxRelayService>();
 
 var app = builder.Build();
 
