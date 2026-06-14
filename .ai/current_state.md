@@ -1,7 +1,7 @@
 # Infraspekt — Current State
 > **Live checkpoint.** Updated by the Orchestrator at the end of every phase.  
 > Rule: never truncate history. Append only — except `## Last Session Summary` and `## Active Infrastructure Snapshot` (full replacements).  
-> Last updated: 2026-06-13 (Day 05)
+> Last updated: 2026-06-13 (Day 09)
 
 ---
 
@@ -20,9 +20,9 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* M2.3 — Background consumer with idempotency key enforcement: Worker consumes `UserCreatedEvent` via Rebus; `IdempotencyRecords` table tracks processed messages; duplicate suppression + crash recovery implemented.
-* 33/33 unit tests passing (26 existing + 7 new handler tests); PR #9 squash-merged into `develop`.
-* Next: M2.4 — Dead Letter Queue consumer and alerting. Phase 02 continues. Carry-forward: none.
+* M2.4 — Dead Letter Queue consumer and alerting: `DeadLetterHandler` consumes DLQ messages with fail-safe persistence; `DlqDepthMonitor` periodically polls ASB DLQ depth and fires `LogLevel.Error` alert when configurable threshold (default: 5) is exceeded; rate-limited alert dedup prevents log spam.
+* 47/47 unit tests passing (36 existing + 11 new DLQ tests); PR #10 squash-merged into `develop`.
+* Next: M2.5 — Transactional Outbox pattern. Phase 02 continues. Carry-forward: none.
 
 ---
 
@@ -111,6 +111,21 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 
 ---
 
+## Phase Outputs — Day 09
+> Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
+
+| Phase | Artifact | Status |
+|---|---|---|
+| 0 | State initialized, variables resolved → M2.4 DLQ consumer + alerting | ✅ |
+| 0b | *Skipped* (repo has prior commits) | ✅ |
+| 1 | `docs/architecture/day_09_spec.md` | ✅ |
+| 2 | Commit log — 5/5 units committed, zero halted — feature branch on `origin` | ✅ |
+| 4 | `ops/Dockerfile` milestone label · `ops/runbooks/day_09_runbook.md` | ✅ |
+| 4b | Review + PR #10 merged to `develop` | ✅ |
+| 5 | State update, roadmap update, changelog, validation | ✅ |
+
+---
+
 ## Incomplete Tasks
 > Tasks started this day but halted (lint/test failure, spec ambiguity, reviewer FAIL routing).  
 > **Must be empty before Day N+1 can begin.** Populated by Reviewer FAIL verdict or commit-gate halt.
@@ -148,6 +163,7 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 | 06 | Rebus + Azure Service Bus wired | `KendoMessage` + `KendoRebusConfiguration` in Kendo.Shared; Gateway + UserService producers, Worker consumer; 4 Messaging tests; CI fix (Wait for all 4 healthy) | PR #7 merged to develop | ✅ |
 | 07 | First async endpoint (M2.2) | `UsersController` (POST 202 + GET status), `User` entity, `UserCreatedEvent`, EF migration, 9 new tests, runbook | PR #8 merged to develop | ✅ |
 | 08 | Background consumer (M2.3) | `UserCreatedEventHandler`, `IdempotencyRecords` table, idempotency enforcement, crash recovery, 7 new handler tests, runbook | PR #9 merged to develop | ✅ |
+| 09 | DLQ consumer & alerting (M2.4) | `DeadLetteredMessage` + `KendoRebusDlqConfiguration` in Shared; `DeadLetterHandler`, `DlqDepthMonitor`, `DlqRecord` in Worker; 11 new tests, runbook | PR #10 merged to develop | ✅ |
 
 ---
 
@@ -164,6 +180,8 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 | Worker | Background Service | Async processing, health endpoint, Rebus consumer | Day 01 | Rebus (ASB), Gateway, UserService |
 | Rebus (ASB transport) | Message Bus | Azure Service Bus transport via Rebus, producer + consumer modes, `kendo-events` queue | Day 06 | Gateway (producer), UserService (producer), Worker (consumer) |
 | IdempotencyRecords | DB table | Tracks processed messages by MessageId PK; enforces idempotency, enables crash recovery | Day 08 | Worker (UserCreatedEventHandler) |
+| DlqRecords | DB table | Tracks dead-lettered messages from ASB DLQ; audit trail for manual recovery | Day 09 | Worker (DeadLetterHandler) |
+| Dead Letter Queue | ASB DLQ (auto) | `kendo-events/$DeadLetterQueue` — auto-created by ASB for the main queue | Day 09 | Worker (DeadLetterHandler, DlqDepthMonitor) |
 
 ---
 
@@ -175,9 +193,9 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 * **Database:** PostgreSQL 16 + pgvector (`pgvector/pgvector:pg16`), `kendo_users` DB, `vector` extension enabled via EF Core migration
 * **Messaging:** Rebus registered with Azure Service Bus transport — Gateway + UserService in producer mode (one-way client), Worker in consumer mode (polls `kendo-events`, 3 workers). Graceful skip when `Rebus__ConnectionString` is missing (local dev).
 * **Idempotency:** `IdempotencyRecords` table (WorkerDbContext) tracks message processing status (Processing/Completed/Failed). MessageId PK enforces uniqueness. Crash recovery re-processes messages left in Processing state. All handlers wrap DB ops in transactions.
-* **Branches:** `main` (scaffolding), `develop` (PR #7 squash-merged — Day 06) — both on `origin`
+* **Branches:** `main` (scaffolding), `develop` (PR #10 squash-merged — Day 09) — both on `origin`
 * **Pipelines:** CI pipeline active (`.github/workflows/ci.yml`) — build → unit tests → data integration tests (with pgvector service container) → resilience tests → **messaging tests** → docker compose health verification. CI `Wait for healthy` step hardened to wait for all 4 services.
-* **Tests:** 50/50 xUnit tests passing (8 health-check + 4 data integration + 13 resilience + 4 observability + 10 ProblemDetails middleware + 4 Messaging registration + 7 Worker handler idempotency)
+* **Tests:** 47/47 unit tests passing (8 health-check + 4 data integration + 13 resilience + 4 observability + 10 ProblemDetails middleware + 4 Messaging registration + 7 Worker handler idempotency + 4 DeadLetterHandler + 7 DlqDepthMonitor)
 * **Observability:** All 3 services emit OpenTelemetry traces to console exporter; trace IDs correlated in all ILogger log lines; Polly callbacks emit structured logs with trace context; error responses include trace ID in RFC 7807 `traceId` field
 * **Local:** API instances: 3 (Gateway, UserService, Worker), Postgres: 1 (Docker), RabbitMQ: 1 (infrastructure, not yet consumed), Redis: 1 (infrastructure)
 
@@ -202,3 +220,5 @@ phase_plan: "02"        # platform_roadmap.md phase reference
 * **RFC 7807 Problem Details:** All 3 services return `application/problem+json` on all 4xx/5xx responses via shared `ProblemDetailsMiddleware` in `Kendo.Shared`. Exception→status mapping: `ArgumentException`→400, `KeyNotFoundException`→404, `OperationCanceledException`→503, generic→500, client-disconnect→499. Health endpoints exempt. *(Day 05)*
 * **Async Messaging — Rebus:** Rebus `10.7.2` + `Rebus.AzureServiceBus` `10.7.0` added to all 3 services. Shared `AddKendoRebus()` extension in `Kendo.Shared.Messaging` with producer (one-way ASB client, auto-skip on missing connection string) and consumer (ASB queue `kendo-events`, 3 workers, 10 parallelism) modes. `KendoMessage` abstract record defines base message shape (`MessageId`, `CreatedAt`). *(Day 06)*
 * **Idempotency — MessageId Key:** `KendoMessage.MessageId` used as idempotency key. `IdempotencyRecords` table in WorkerDbContext tracks Processing/Completed/Failed states. MessageId PK enforces unique constraint. Crash recovery re-processes Processing-state messages. *(Day 08)*
+* **DLQ Consumer — DeadLetterQueue sub-queue:** ASB auto-creates `kendo-events/$DeadLetterQueue` for the main queue. `KendoRebusDlqConfiguration.AddKendoRebusDlqConsumer()` registers a separate Rebus consumer on this sub-queue with `NumberOfWorkers: 1`. The consumer is disabled by default (`Rebus__DlqConsumerEnabled: false`). `DeadLetterHandler` is fail-safe — acknowledges messages even if persistence fails, preventing re-delivery loops. *(Day 09)*
+* **DLQ Depth Monitoring — Polling Monitor:** `DlqDepthMonitor` BackgroundService polls ASB management API at configurable interval (default 60s). Alert fires via `LogLevel.Error` when depth exceeds configurable threshold (default 5). Rate-limited dedup prevents alert spam. *(Day 09)*
