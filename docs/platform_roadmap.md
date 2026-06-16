@@ -2,7 +2,14 @@
 > **Orchestration reference.** Loaded by the Entrypoint for the `{{phase_plan}}` section in scope.  
 > Each phase defines the milestone markers, acceptance criteria, and architectural components  
 > that must exist and function **at phase-end** before the next phase begins.  
-> Last updated: 2026-06-12
+> Last updated: 2026-06-16
+
+> **Phase numbering note:** Phases 01–03 are **complete**. The orchestrator (`.ai/current_state.md`)
+> currently has **Phase 04 — Observability & Validation Hardening** reserved as the next
+> planned phase. **Phase 05 — AI/Vector Service (FastAPI)** is introduced here to capture
+> the aspirational FastAPI workload referenced in `README.md` and detailed in
+> `docs/architecture/fastapi_rag_service_spec.md`. Phase 04 will be authored when the
+> orchestrator picks up that work; this numbering is intentional and does not collide.
 
 ---
 
@@ -118,3 +125,97 @@
 | `Graceful Shutdown` | `SIGTERM` handler + drain timeout on all services | ✅ |
 | `Ops Runbooks` | `ops/runbooks/` — one file per failure scenario | ✅ |
 | *(All Phase 01 + 02 components)* | Inherited and still passing all prior acceptance criteria | ~ |
+
+---
+
+## Phase 05 — AI/Vector Service (FastAPI)
+
+**Goal:** Add a dedicated, non-.NET AI/vector service for heavy and streaming LLM
+workloads, **co-existing** with the .NET Semantic Kernel path. The .NET stack remains
+primary for synchronous RAG inside `UserService`; FastAPI is the offload target the
+Gateway calls for long-running, streaming, or batch LLM operations. This phase is
+**planned, not yet started** — there is no Python code in `src/` today. The full spec
+that drives implementation is `docs/architecture/fastapi_rag_service_spec.md`.
+
+> **Resilience parity:** This phase introduces the first non-.NET workload. The README's
+> "Polly" callout is .NET-specific; this phase uses the Python equivalents —
+> `pybreaker` (circuit breaker), `tenacity` (retry with backoff + jitter), `asyncio`
+> semaphores (bulkhead). All other platform standards (RFC 7807, OpenTelemetry,
+> `/health/live` + `/health/ready`, `traceparent` propagation) apply unchanged.
+
+### Milestone Markers
+
+- **M5.1** Service scaffold: `src/FastAPIService/` Python 3.12 + FastAPI + Uvicorn
+  containerized; `docker compose up fastapi` brings the service up; `/health/live` and
+  `/health/ready` return correct codes.
+- **M5.2** LangChain RAG pipeline: `POST /v1/rag/query` (sync) and `POST /v1/rag/stream`
+  (SSE) implemented; end-to-end RAG against pgvector works using the same embedding
+  model `UserService` uses for ingestion.
+- **M5.3** Read-only pgvector integration: dedicated `fastapi_ro` PostgreSQL role
+  provisioned by a `UserService` migration; FastAPI connects with read-only DSN; any
+  write attempt is rejected by the database, not just by code.
+- **M5.4** Gateway integration: `Gateway` exposes `/api/rag/{sync,stream}` and proxies
+  to `FastAPIService` via a typed `IFastAPIClient` with Polly timeout + circuit breaker.
+- **M5.5** Resilience parity: `pybreaker` circuit breakers per external dependency
+  (pgvector, Azure OpenAI); `tenacity` retry with exponential backoff + jitter; no raw
+  exceptions cross the network boundary — every error is RFC 7807.
+- **M5.6** Observability + chaos + runbook: OpenTelemetry SDK wired with OTLP export;
+  `traceparent` propagated from Gateway through FastAPI and embedded in SSE events;
+  chaos test suite (DB down, Azure OpenAI down, FastAPI crash, slow stream) integrated
+  into CI; `ops/runbooks/fastapi_service.md` published.
+
+### Acceptance Criteria
+
+- [ ] `docker compose up -d fastapi` starts the container; `/health/live` returns `200`
+  with no dependency checks; `/health/ready` returns `200` only when pgvector and Azure
+  OpenAI are reachable and the LangChain pipeline is loaded.
+- [ ] FastAPI connects to pgvector as the `fastapi_ro` role; an `INSERT` from inside
+  the FastAPI container is rejected by PostgreSQL with `permission denied` (role-level
+  enforcement verified by an integration test).
+- [ ] `POST /v1/rag/query` returns a coherent answer + scored contexts in the response
+  body; latency p95 is within the agreed budget; `trace_id` field is populated.
+- [ ] `POST /v1/rag/stream` emits SSE chunks in `text/event-stream`; each event carries a
+  `traceparent` that links back to the originating Gateway span.
+- [ ] Azure OpenAI circuit breaker trips after N consecutive failures; subsequent
+  requests return RFC 7807 `503` (not a raw exception); the breaker recovers
+  automatically after the cooldown.
+- [ ] pgvector circuit breaker trips independently from the Azure OpenAI breaker (one
+  dependency's failure does not trip the other).
+- [ ] Retry policy retries transient DB failures with exponential backoff + jitter;
+  retries are visible as span events in OpenTelemetry traces.
+- [ ] OpenTelemetry trace IDs appear in every log line for a given FastAPI request
+  (correlation enforced, same standard as Phases 01–03).
+- [ ] Gateway's Polly circuit breaker trips when FastAPI is down; clients see RFC 7807
+  `503` from the Gateway, not a connection refused.
+- [ ] Rate limiter returns `429 Too Many Requests` with `Retry-After` above the
+  configured per-JWT threshold.
+- [ ] Chaos test suite runs in CI: DB down, Azure OpenAI down, FastAPI crash, slow
+  stream — all produce a structured pass/fail report; pipeline fails on any regression.
+- [ ] Runbook `ops/runbooks/fastapi_service.md` covers: Azure OpenAI outage, pgvector
+  read replica failover, FastAPI crash loop, JWKS rotation.
+- [ ] JWT validation succeeds with a Gateway-issued token; fails closed on expired,
+  wrong-audience, or missing token.
+- [ ] All Phase 01, 02, and 03 acceptance criteria still pass after FastAPI integration
+  (regression guard).
+
+### Architectural Components — Existing & Functioning at Phase-End
+
+> Legend: ✅ complete · ❌ failed/blocked · ~ not yet started
+
+| Component | Description | Status |
+|---|---|---|
+| `FastAPIService` (Python) | `src/FastAPIService/` — FastAPI + Uvicorn, JWT auth, RFC 7807, OpenTelemetry, health endpoints | ~ (planned) |
+| `LangChain RAG Pipeline` | `RetrievalQA` chain, versioned prompt templates, sync + SSE streaming | ~ (planned) |
+| `pgvector Read-Only Role` | `fastapi_ro` PostgreSQL role provisioned by `UserService` migration; SELECT-only grants | ~ (planned) |
+| `pybreaker` | Circuit breaker per external dependency (pgvector, Azure OpenAI) with state metrics | ~ (planned) |
+| `tenacity` Retry | Exponential backoff + jitter, transient-fault predicate, span-event visibility | ~ (planned) |
+| `RFC 7807 Problem Details` | FastAPI exception handler returning `application/problem+json` with `trace_id` | ~ (planned) |
+| `OpenTelemetry (FastAPI)` | `opentelemetry-instrumentation-fastapi`, `-asyncpg`, `-httpx`; OTLP exporter | ~ (planned) |
+| `Trace Correlation (FastAPI)` | `traceparent` extracted from Gateway request; embedded in every SSE event | ~ (planned) |
+| `Gateway → FastAPI Client` | Typed `IFastAPIClient` with Polly timeout + circuit breaker; `/api/rag/{sync,stream}` route | ~ (planned) |
+| `FastAPI Rate Limiter` | Token-bucket per JWT subject; `429 + Retry-After` | ~ (planned) |
+| `FastAPI Chaos Suite` | xUnit (.NET side) + pytest (Python side); DB down, Azure OpenAI down, crash, slow stream | ~ (planned) |
+| `FastAPI Runbook` | `ops/runbooks/fastapi_service.md` — failure-mode playbook | ~ (planned) |
+| `FastAPI Dockerfile` | Multi-stage `python:3.12-slim`, non-root user, health check | ~ (planned) |
+| `docker compose` (FastAPI service) | Internal-network port `8000`, health check wired to Docker, ≥ 2 replicas when Phase 03 HA standards apply | ~ (planned) |
+| *(All Phase 01 + 02 + 03 components)* | Inherited and still passing all prior acceptance criteria; the .NET Semantic Kernel RAG path remains primary for synchronous RAG | ✅ (inherited) |
