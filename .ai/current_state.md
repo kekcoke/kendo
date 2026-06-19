@@ -9,10 +9,10 @@
 
 ```yaml
 current_day: 17
-current_phase: 0        # 0=Init · 0b=Bootstrap · 1=Architect · 2=Dev+QA · 4=DevOps · 4b=Review · 5=State Update
+current_phase: 1        # Phase 0 done · Phase 1: Adopt pre-authored day_17_spec.md (M0.1+M0.2)
 branch_base: develop
-feature_branch: ~       # resolved in Phase 1 from {{SLUG}}
-phase_plan: "03"        # platform_roadmap.md phase reference
+feature_branch: feature/day-17-gateway-jwt-ai-integration  # resolved from {{SLUG}}
+phase_plan: "04"        # Pre-FastAPI Reconciliation
 ```
 
 ---

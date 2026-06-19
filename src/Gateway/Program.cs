@@ -1,3 +1,4 @@
+using Kendo.Shared.Authentication;
 using Kendo.Shared.Caching;
 using Kendo.Shared.ErrorHandling;
 using Kendo.Shared.Http;
@@ -6,6 +7,8 @@ using Kendo.Shared.Observability;
 using Kendo.Shared.GracefulShutdown;
 using Kendo.Shared.RateLimiting;
 using Kendo.Shared.Resilience;
+using Kendo.Gateway.Middleware;
+using Kendo.Gateway.WellKnown;
 using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,6 +22,15 @@ builder.Services.AddControllers()
 
 builder.Services.Configure<ApiBehaviorOptions>(options =>
     options.SuppressModelStateInvalidFilter = true);
+
+// JWT authentication
+builder.Services.AddKendoJwt(builder.Configuration);
+
+// Authorization policies (shared with day_20)
+builder.Services.AddKendoAdminScopePolicies();
+
+// FastAPI service client (W1-W7 workloads)
+builder.Services.AddKendoFastApiClient(builder.Configuration);
 
 builder.Services.AddKendoResilience(builder.Configuration);
 builder.Services.AddKendoObservability(builder.Configuration, "kendo-gateway");
@@ -39,6 +51,13 @@ app.UseKendoRateLimiter();
 app.UseKendoErrorHandling();
 app.UseKendoReplicaIdentity();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
+// W4 — Intent Advisory (fail-open; FastAPI outage → fallback)
+app.UseMiddleware<IntentAdvisoryMiddleware>();
+
+app.MapJwksEndpoint();
 app.MapControllers();
 
 app.Run();
