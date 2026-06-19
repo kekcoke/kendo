@@ -58,6 +58,8 @@ services:
       - DOTNET_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=kendo_users;Username=kendo;Password=kendo_dev
       - Redis__ConnectionString=redis:6379
+      - Rebus__AiWorkers=2
+      - Rebus__AiParallelism=5
     depends_on:
       postgres:
         condition: service_healthy
