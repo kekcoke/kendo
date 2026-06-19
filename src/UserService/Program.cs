@@ -26,6 +26,7 @@ builder.Services.AddKendoObservability(builder.Configuration, "kendo-userservice
 builder.Services.AddKendoDistributedCache(builder.Configuration);
 builder.Services.AddKendoErrorHandling();
 builder.Services.AddKendoRebus(builder.Configuration, "producer");
+builder.Services.AddKendoRebusAiProducer(builder.Configuration);
 builder.Services.AddKendoGracefulShutdown(builder.Configuration);
 
 builder.Services.AddDbContext<AppDbContext>(options =>

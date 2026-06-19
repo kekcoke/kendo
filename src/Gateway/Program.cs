@@ -38,6 +38,7 @@ builder.Services.AddKendoDistributedCache(builder.Configuration);
 builder.Services.AddKendoRateLimiting(builder.Configuration);
 builder.Services.AddKendoErrorHandling();
 builder.Services.AddKendoRebus(builder.Configuration, "producer");
+builder.Services.AddKendoRebusAiProducer(builder.Configuration);
 builder.Services.AddKendoGracefulShutdown(builder.Configuration);
 
 builder.Services.AddHttpClient("default")
