@@ -97,57 +97,109 @@ For each issue: state the specific inconsistency and your proposed resolution. D
 
 ---
 
-## Kickstarter Prompt
-> Paste as the **first message** in a new Orchestrator session. Replace `[01|02|03]`.  
-> Requires `@file` reference support (Claude Projects, API with file tools, Gemini Files API).
+## Kickstarter Prompts
 
+Use the appropriate prompt below depending on the state of the session. 
+All prompts assume `@file` reference support.
+
+### Prompt 1 — Bootstrap (Absolute First Session)
+> Use once only: Day 1, Phase 01, no prior commits. Phase 0b bootstrap will run.
+
+```text
+Read @.ai/entrypoint.md, @.ai/orchestration.md, and @.ai/current_state.md.
+Read the Phase 01 section of @docs/platform_roadmap.md.
+
+Set {{phase_plan}} as 01.
+
+This is the first session. Note that Phase 0b (branch bootstrap) will run
+after Phase 0 gate clears — confirm no commits exist before executing it.
+
+Adopt the Orchestrator persona. Output your Session Plan and await my
+confirmation before executing Phase 0. If you detect any gaps or
+inconsistencies in the loaded files, surface them before planning.
 ```
-Read @.ai/entrypoint.md and @.ai/current_state.md.
-Set {{phase_plan}} as [01 | 02 | 03], referencing the matching phase in @docs/platform_roadmap.md.
-Acknowledge these instructions, adopt the Orchestrator persona, output your Session Plan, and await my confirmation before executing Phase 0.
-Otherwise, ask for clarification on any gaps or inconsistencies you detect.
+
+### Prompt 2 — Standard New Day (Spec-Aware)
+> Use at the start of every normal session. The Orchestrator auto-derives the milestone and adopts pre-authored design specs if they exist.
+
+```text
+Read @.ai/entrypoint.md, @.ai/orchestration.md, and @.ai/current_state.md.
+Read the Phase {{phase_plan}} section of @docs/platform_roadmap.md.
+
+Adopt the Orchestrator persona. Derive this session's milestone from the
+first ~ row in the ### Components table for Phase {{phase_plan}}.
+
+CRITICAL: Check the `docs/architecture/` folder. Does a spec file already 
+exist for this specific milestone or component (e.g., day_{{DAY_NUMBER}}_spec.md 
+or a named spec like fastapi_rag_service_spec.md)? 
+
+- If YES: Your Session Plan must instruct the Phase 1 Architect to READ and ADOPT 
+  the existing spec, strictly preserving its data contracts and implementation plan, 
+  rather than generating a new one from scratch.
+- If NO: Proceed with standard Phase 1 generation.
+
+Output your Session Plan — including the resolved {{MILESTONE}} and
+{{MILESTONE_TITLE}} — and await my confirmation before executing Phase 0.
+Surface any blockers from incomplete_tasks or carry-forward items before planning.
 ```
 
----
+### Prompt 3 — Resume Mid-Session
+> Use when a prior session was interrupted. Resumes from the exact phase.
 
-## Kickstarter Prompt — Plain Chat Fallback
-> Use when `@file` references are not available (e.g. plain Claude.ai chat, Gemini web UI).  
-> Paste the block below as your **first message**. Fill in the three `[PASTE ...]` placeholders.
+```text
+Read @.ai/orchestration.md and @.ai/current_state.md.
 
-````
-You are the Kendo Orchestrator. Your single source of truth is the orchestration rules below.
+You are the Kendo Orchestrator resuming an in-progress session.
 
----
-### ORCHESTRATION RULES
-[PASTE full contents of .ai/orchestration.md here]
+Current state:
+- Day: {{DAY_NUMBER}}
+- Resuming from: Phase {{current_phase}}
+- Milestone in progress: {{MILESTONE}} — {{MILESTONE_TITLE}}
+- Branch: {{feature_branch}}
 
----
-### CURRENT STATE
-[PASTE full contents of .ai/current_state.md here]
+[If resuming Phase 2 — paste the ## Commit Log table here so far]
 
----
-### PLATFORM ROADMAP — PHASE IN SCOPE
-[PASTE only the relevant Phase 01 / 02 / 03 section from docs/platform_roadmap.md here]
+Do NOT restart from Phase 0. Resume from Phase {{current_phase}}, verify
+the gate conditions for the phase you are resuming, and continue.
+Surface any inconsistencies before proceeding.
+```
 
----
+### Prompt 4 — Phase Advance
+> Use when all components in the current phase are ✅. Sets a new `phase_plan`.
 
-Set {{phase_plan}} as [01 | 02 | 03].
-Adopt the Orchestrator persona, output your Session Plan in the format defined in the orchestration rules, and await my confirmation before executing Phase 0.
-Otherwise, ask for clarification on any gaps or inconsistencies you detect.
-````
+```text
+Read @.ai/entrypoint.md, @.ai/orchestration.md, and @.ai/current_state.md.
+Read the Phase {{NEW_PHASE}} section of @docs/platform_roadmap.md.
 
-### Token budget guidance (plain chat)
+Phase {{COMPLETED_PHASE}} is complete. Advance phase_plan to {{NEW_PHASE}}.
 
-| Model | Context limit | Risk phase | Mitigation |
-|---|---|---|---|
-| Claude Sonnet | 200K tokens | Phase 2 (commit loop) | Checkpoint `## Commit Log` + update `current_state.md`, continue in new window |
-| Gemini 2.5 Flash | 1M tokens | Rarely an issue | Use system instruction slot for orchestration rules block if available |
+Adopt the Orchestrator persona. Verify that all ### Components rows for
+Phase {{COMPLETED_PHASE}} are marked ✅ before proceeding. Derive the
+first milestone from the Phase {{NEW_PHASE}} ### Components table.
 
-> **Mid-session resume (plain chat):** If context fills during Phase 2, start a new chat with:
-> ```
-> You are the Kendo Orchestrator resuming Day {{DAY_NUMBER}} at Phase 2, Milestone {{MILESTONE}}.
-> Orchestration rules: [PASTE .ai/orchestration.md]
-> Current state (updated checkpoint): [PASTE .ai/current_state.md]
-> Commit log so far: [PASTE ## Commit Log table from prior session]
-> Resume from commit unit N. Do not restart from Phase 0.
-> ```
+Output your Session Plan for Day {{DAY_NUMBER}}, Phase {{NEW_PHASE}},
+and await my confirmation before executing Phase 0.
+```
+
+### Prompt 5 — Post-FAIL Restart (Safe-Discard)
+> Use after a Reviewer FAIL verdict. Ensures pre-authored specs are not blindly deleted.
+
+```text
+Read @.ai/orchestration.md and @.ai/current_state.md.
+Read the Phase {{phase_plan}} section of @docs/platform_roadmap.md.
+Read @docs/architecture/day_{{DAY_NUMBER}}_review_report.md.
+
+You are the Kendo Orchestrator. The prior Phase 4b review issued a FAIL
+verdict. incomplete_tasks is non-empty.
+
+Before doing anything else:
+1. List each blocker from incomplete_tasks with its responsible agent.
+2. Discard the failed day's implementation artifacts (commit log, branch, runbook).
+3. CRITICAL: Do NOT discard the `day_{{DAY_NUMBER}}_spec.md` if it was pre-authored 
+   or represents a locked architectural contract. Only discard it if the FAIL 
+   verdict explicitly cited fundamental architectural flaws.
+4. Restart from Phase 1 — do NOT re-run Phase 0 or re-derive the milestone.
+   The milestone remains {{MILESTONE}} — {{MILESTONE_TITLE}}.
+
+Await my confirmation that blockers are understood before executing Phase 1.
+```
