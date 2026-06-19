@@ -37,6 +37,7 @@ builder.Services.AddKendoObservability(builder.Configuration, "kendo-worker");
 builder.Services.AddKendoDistributedCache(builder.Configuration);
 builder.Services.AddKendoErrorHandling();
 builder.Services.AddKendoRebus(builder.Configuration, "consumer");
+builder.Services.AddKendoRebusAiConsumer(builder.Configuration);
 builder.Services.AddKendoGracefulShutdown(builder.Configuration);
 
 // Register Rebus handlers from the Worker assembly
