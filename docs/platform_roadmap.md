@@ -158,12 +158,12 @@
 
 | Component | Description | Status |
 |---|---|---|
-| `Gateway JWT Auth` | `RsaKeyProvider`, `JwksEndpoint`, local RS256 validation | ~ |
-| `Gateway FastAPI Client` | `IFastAPIClient` with Polly pipeline, RFC 7807 mapping | ~ |
-| `Gateway AI Controllers` | `RagController`, `UserSearchController`, `AssistantController` | ~ |
-| `Gateway Advisory Middleware` | `IntentAdvisoryMiddleware` with hard-coded fallback | ~ |
-| `AI Event Contracts` | 4 new `KendoMessage` types for AI workflows | ~ |
-| `AI Queue Topology` | `kendo-events-ai` queue, producers, consumers, DLQ | ~ |
+| `Gateway JWT Auth` | `RsaKeyProvider`, `JwksEndpoint`, local RS256 validation | ✅ |
+| `Gateway FastAPI Client` | `IFastAPIClient` with Polly pipeline, RFC 7807 mapping | ✅ |
+| `Gateway AI Controllers` | `RagController`, `UserSearchController`, `AssistantController` | ✅ |
+| `Gateway Advisory Middleware` | `IntentAdvisoryMiddleware` with hard-coded fallback | ✅ |
+| `AI Event Contracts` | 4 new `KendoMessage` types for AI workflows | ✅ |
+| `AI Queue Topology` | `kendo-events-ai` queue, producers, consumers, DLQ | ✅ |
 | `Worker AI Handlers` | 4 new Rebus message handlers, dispatcher service | ~ |
 | `Worker FastAPI Client` | `IFastAPISummarizationClient` for W7 streaming | ~ |
 | `UserService Event Domain` | `Event`, `EventValidation`, `UserEmbedding` entities | ~ |

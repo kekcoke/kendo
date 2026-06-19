@@ -1,17 +1,17 @@
 # Infraspekt — Current State
 > **Live checkpoint.** Updated by the Orchestrator at the end of every phase.  
 > Rule: never truncate history. Append only — except `## Last Session Summary` and `## Active Infrastructure Snapshot` (full replacements).  
-> Last updated: 2026-06-14 (Day 15)
+> Last updated: 2026-06-19 (Day 18)
 
 ---
 
 ## Session Variables
 
 ```yaml
-current_day: 17
-current_phase: 1        # Phase 0 done · Phase 1: Adopt pre-authored day_17_spec.md (M0.1+M0.2)
+current_day: 19
+current_phase: 0        # Phase 0 ready for next session
 branch_base: develop
-feature_branch: feature/day-17-gateway-jwt-ai-integration  # resolved from {{SLUG}}
+feature_branch: TBD  # resolved by next session Phase 1 {{SLUG}}
 phase_plan: "04"        # Pre-FastAPI Reconciliation
 ```
 
@@ -20,9 +20,9 @@ phase_plan: "04"        # Pre-FastAPI Reconciliation
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* **M3.6 complete** — Ops Runbooks: 4 scenario-specific recovery playbooks created (`db-failover.md`, `service-crash-recovery.md`, `dlq-drain.md`, `horizontal-scaling.md`) plus central index (`day_16_runbook.md`) referencing all existing day runbooks. Each playbook includes detection, triage, step-by-step recovery, post-mortem checklist. Chaos-test CI flakiness documented per carry-forward. 97/97 unit tests passing. PR #20 squash-merged into `develop`.
-* **Phase 03 complete** — All 8 components for High Availability & Chaos Testing are ✅. Next: road to Phase 04 (observability).
-* Carry-forward maintained: chaos-test CI flakiness (`test_db_downtime`) — documented in runbooks with mitigation approaches, not yet applied to `scripts/chaos/test_db_downtime.sh`.
+* **M0.3+M0.4 complete** — AI Event Contracts + Queue Topology implemented across 12 files, 471 additions. 119/119 unit tests passing (zero regression). 4 new event types (EventIngestedEvent, EventValidatedEvent, UserEmbeddingUpdatedEvent, NotificationRequestedEvent) with KendoTopology constants, dedicated kendo-events-ai consumer/producer extensions, and dual-queue DlqDepthMonitor. PR #23 squash-merged into `develop`.
+* **Phase 04, Part 2 complete** — 6/12 Phase 04 components now ✅ (added AI Event Contracts, AI Queue Topology). Next: Day 19 — Worker AI Handlers (M0.5).
+* Carry-forward maintained: chaos-test CI flakiness (`test_db_downtime`) — still documented in M3.6 runbooks, not yet resolved. Day 17 open questions (IssuerSigningKeyResolver refactor, no user JWT issuance, no rotation BackgroundService) carried forward.
 
 ---
 
@@ -200,6 +200,21 @@ phase_plan: "04"        # Pre-FastAPI Reconciliation
 
 ---
 
+## Phase Outputs — Day 18
+> Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
+
+| Phase | Artifact | Status |
+|---|---|---|
+| 0 | State initialized, variables resolved → M0.3+M0.4 AI Event Contracts + Queue Topology | ✅ |
+| 0b | *Skipped* (repo has prior commits) | ✅ |
+| 1 | `docs/architecture/day_18_spec.md` (adopted, pre-authored) | ✅ |
+| 2 | Commit log — 7/7 units committed, zero halted — feature branch on `origin` | ✅ |
+| 4 | `ops/runbooks/day_18_runbook.md` · `docker-compose.yml` (AI queue env vars) · `.env.example` | ✅ |
+| 4b | `docs/architecture/day_18_review_report.md` + PR #23 merged to `develop` | ✅ |
+| 5 | State update, roadmap update, changelog, validation | ✅ |
+
+---
+
 ## Incomplete Tasks
 > Tasks started this day but halted (lint/test failure, spec ambiguity, reviewer FAIL routing).  
 > **Must be empty before Day N+1 can begin.** Populated by Reviewer FAIL verdict or commit-gate halt.
@@ -221,6 +236,7 @@ phase_plan: "04"        # Pre-FastAPI Reconciliation
 > Open blockers, homework, and unresolved decisions. Remove when resolved; append when new ones arise.
 
 - **chaos-test CI flakiness (Day 13/15/16):** `test_db_downtime` chaos test intermittently fails in CI returning `000000` (connection refused) instead of expected 503. **Fully documented in M3.6 runbooks** — see `ops/runbooks/db-failover.md` §Known CI Flakiness for symptom, suspected root cause, and 3 mitigation approaches. Not blocking CI (~90% pass rate). Carry-forward maintained for engineering action — recommended mitigation #2 (retry loop after `docker compose unpause`) should be applied to `scripts/chaos/test_db_downtime.sh`.
+- **Day 17 — open questions for closure refactoring:** `IssuerSigningKeyResolver` uses `BuildServiceProvider()` anti-pattern — needs closure-based refactor. User JWT issuance not implemented (validation only). Key rotation has no `BackgroundService` — manual only. Carried forward for Day 19+/clean-up sprint.
 
 ---
 
@@ -246,6 +262,8 @@ phase_plan: "04"        # Pre-FastAPI Reconciliation
 | 14 | Rate limiting & load shedding (M3.4) | RateLimitingMiddleware (429 + Retry-After), LoadSheddingMiddleware (503 RFC 7807), 8 new tests (84 total), runbook | PR #17 squash-merged to `develop` | ✅ |
 | 15 | Graceful shutdown (M3.5) | `Kendo.Shared.GracefulShutdown` module (RequestTracker, GracefulShutdownMiddleware, GracefulShutdownHostedService), wired into all 3 services, 13 new tests (97 total), runbook | PR #19 squash-merged to `develop` | ✅ |
 | 16 | Ops runbooks (M3.6) | 4 scenario playbooks (db-failover, service-crash, dlq-drain, horizontal-scaling) + central index; chaos-test CI flakiness documented; 0 code changes; 97/97 tests passing | PR #20 squash-merged to `develop` | ✅ |
+| 17 | Gateway JWT auth + FastAPI AI integration (M0.1+M0.2) | RsaKeyProvider, JwksEndpoint, AddKendoJwt, ServiceJwtMinter, AdminScopePolicies, IFastAPIClient, FastAPIClient (Polly timeout+retry+CB), RagController (W1/W2), UserSearchController (W3), AssistantController (W6), IntentAdvisoryMiddleware (W4); 22 files, 1363 additions; 22 new tests (119 total) | PR #22 merged to `develop` | ✅ |
+| 18 | AI Event Contracts + Queue Topology (M0.3+M0.4) | KendoTopology constants, 4 AI event types (EventIngested, EventValidated, UserEmbeddingUpdated, NotificationRequested), AddKendoRebusAiConsumer, AddKendoRebusAiProducer, dual-queue DlqDepthMonitor, Program.cs wiring across 3 services; 12 files, 471 additions; 119/119 tests passing | PR #23 squash-merged to `develop` | ✅ |
 
 ---
 
@@ -265,6 +283,8 @@ phase_plan: "04"        # Pre-FastAPI Reconciliation
 | DlqRecords | DB table | Tracks dead-lettered messages from ASB DLQ; audit trail for manual recovery | Day 09 | Worker (DeadLetterHandler) |
 | Dead Letter Queue | ASB DLQ (auto) | `kendo-events/$DeadLetterQueue` — auto-created by ASB for the main queue | Day 09 | Worker (DeadLetterHandler, DlqDepthMonitor) |
 | OutboxMessages | DB table | Transactional outbox table for atomic event publishing; filtered index for unprocessed messages, unique index on MessageId | Day 10 | UserService (UsersController, OutboxRelayService) |
+| AI Event Contracts | Messaging | 4 new KendoMessage types for AI workflows (EventIngestedEvent, EventValidatedEvent, UserEmbeddingUpdatedEvent, NotificationRequestedEvent) | Day 18 | Gateway (producer), UserService (producer), Worker (consumer + handlers) |
+| AI Queue Topology | Messaging | `kendo-events-ai` queue with dedicated producer/consumer registrations, TypeBased routing, DLQ monitoring | Day 18 | Worker (AddKendoRebusAiConsumer), Gateway (AddKendoRebusAiProducer), UserService (AddKendoRebusAiProducer) |
 
 ---
 
@@ -274,18 +294,18 @@ phase_plan: "04"        # Pre-FastAPI Reconciliation
 * **Services:** Gateway (port 5000 behind NGINX), UserService (port 5001 expose), Worker (port 5002 expose), PostgreSQL (port 5432), Redis (port 6379), NGINX (port 80 internal, 5000 host) — all containerized
 * **Docker Compose:** All 6 services with health checks; multi-replica (3 each) scaling for chaos testing
 * **Chaos Test Suite:** 3 xUnit tests (`Category=Chaos`) with Docker CLI integration. 3 bash scripts in `scripts/chaos/`. CI job `chaos-test` runs after `docker-compose`, invokes `run_all.sh` on multi-replica stack, uploads structured results artifact
-* **Tests:** 97/97 unit tests passing (84 existing + 13 new graceful shutdown)
-* **Runbooks:** 4 scenario playbooks (`db-failover.md`, `service-crash-recovery.md`, `dlq-drain.md`, `horizontal-scaling.md`) + central index (`day_16_runbook.md`) covering all Phase 03 failure scenarios
-* **Branches:** `develop` (PR #20 squash-merged — Day 16) — on `origin`
+* **Tests:** 119/119 unit tests passing (97 existing + 22 Day 17 JWT/FastAPI tests)
+* **Runbooks:** Day 16 scenario playbooks (`db-failover.md`, `service-crash-recovery.md`, `dlq-drain.md`, `horizontal-scaling.md`) + central index (`day_16_runbook.md`) + Day 17 runbook (`day_17_runbook.md`) + Day 18 runbook (`day_18_runbook.md`) covering AI event contracts and kendo-events-ai queue operations
+* **Branches:** `develop` (PR #23 squash-merged — Day 18: AI Event Contracts + Queue Topology) — on `origin`
 * **Pipelines:** CI pipeline active: build-and-test -> docker-compose -> chaos-test (known flakiness: test_db_downtime intermittent 000000)
 
 * **Docker Compose:** All 6 services with health checks; PostgreSQL (5s interval), app services (10s interval), Redis (5s interval), NGINX (10s interval, wget self-health); `depends_on` postgres healthy → userservice
 * **Database:** PostgreSQL 16 + pgvector (`pgvector/pgvector:pg16`), `kendo_users` DB, `vector` extension enabled via EF Core migration
 * **Messaging:** Rebus registered with Azure Service Bus transport — Gateway + UserService in producer mode (one-way client), Worker in consumer mode (polls `kendo-events`, 3 workers). Graceful skip when `Rebus__ConnectionString` is missing (local dev).
 * **Idempotency:** `IdempotencyRecords` table (WorkerDbContext) tracks message processing status (Processing/Completed/Failed). MessageId PK enforces uniqueness. Crash recovery re-processes messages left in Processing state. All handlers wrap DB ops in transactions.
-* **Branches:** `main` (scaffolding), `develop` (PR #15 squash-merged — Day 12) — both on `origin`
-* **Pipelines:** CI pipeline active (`.github/workflows/ci.yml`) — build → unit tests → data integration tests (with pgvector + Redis service containers) → resilience tests → messaging tests → docker compose health verification (6 single-replica, 12 multi-replica) → replica header verification → traffic distribution check.
-* **Tests:** 97/97 unit tests passing (8 health-check + 4 data integration + 13 resilience + 4 observability + 10 ProblemDetails middleware + 4 Messaging registration + 7 Worker handler idempotency + 4 DeadLetterHandler + 7 DlqDepthMonitor + 6 OutboxSerializer + 5 OutboxRepository + 7 OutboxRelayService + 4 UsersController + 6 OutboxRepository trace + 3 OutboxRelayService trace + 4 UserCreatedEventHandler trace + 4 RateLimiter + 4 LoadShedding + 13 GracefulShutdown)
+* **Branches:** `main` (scaffolding), `develop` (PR #23 squash-merged — Day 18: AI Event Contracts) — both on `origin`
+* **Pipelines:** CI pipeline active — build → unit tests → data integration tests (with pgvector + Redis service containers) → resilience tests → messaging tests → docker compose health verification → replica header verification → traffic distribution check. AI queue topology tests (graceful skip when ASB absent) run as part of messaging tests.
+* **Tests:** 119/119 unit tests passing (97 existing + 22 Day 17 Gateway JWT + FastAPI client tests + existing message serialization/rebus tests inherited)
 * **Observability:** All 3 services emit OpenTelemetry traces to console exporter; trace IDs correlated in all ILogger log lines; Polly callbacks emit structured logs with trace context; error responses include trace ID in RFC 7807 `traceId` field
 * **Local:** API instances: 3 (Gateway, UserService, Worker), Postgres: 1 (Docker), RabbitMQ: 1 (infrastructure, not yet consumed), Redis: 1 (Docker, wired, best-effort cache)
 
