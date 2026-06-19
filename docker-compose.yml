@@ -9,6 +9,16 @@ services:
       - ASPNETCORE_URLS=http://+:5000
       - DOTNET_ENVIRONMENT=Development
       - Redis__ConnectionString=redis:6379
+      - Kendo__Jwt__PrivateKeyPath=secrets/jwt-private.pem
+      - Kendo__Jwt__Issuer=https://gateway.local/.well-known/jwks.json
+      - Kendo__Jwt__Audience=kendo.api
+      - Kendo__Jwt__RotationDays=90
+      - Kendo__Jwt__TokenLifetimeMinutes=60
+      - Kendo__Jwt__ServiceTokenLifetimeSeconds=60
+      - Kendo__FastApi__BaseUrl=http://fastapi:8000
+      - Kendo__FastApi__TimeoutSeconds=30
+      - Kendo__FastApi__CircuitBreakerFailures=3
+      - Kendo__FastApi__CircuitBreakerBreakSeconds=30
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health/live"]
       interval: 10s
