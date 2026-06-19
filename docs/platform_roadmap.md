@@ -164,8 +164,8 @@
 | `Gateway Advisory Middleware` | `IntentAdvisoryMiddleware` with hard-coded fallback | ✅ |
 | `AI Event Contracts` | 4 new `KendoMessage` types for AI workflows | ✅ |
 | `AI Queue Topology` | `kendo-events-ai` queue, producers, consumers, DLQ | ✅ |
-| `Worker AI Handlers` | 4 new Rebus message handlers, dispatcher service | ~ |
-| `Worker FastAPI Client` | `IFastAPISummarizationClient` for W7 streaming | ~ |
+| `Worker AI Handlers` | 4 new Rebus message handlers, dispatcher service | ✅ |
+| `Worker FastAPI Client` | `IFastAPISummarizationClient` for W7 streaming | ✅ |
 | `UserService Event Domain` | `Event`, `EventValidation`, `UserEmbedding` entities | ~ |
 | `UserService Admin Endpoint` | `EmbeddingAdminController` protected by `admin:writes` scope | ~ |
 | `pgvector Roles` | `fastapi_ro` and `userservice_writer` roles provisioned | ~ |
