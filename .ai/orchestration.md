@@ -10,7 +10,7 @@
 | Variable | Type | Resolved By | Description |
 |---|---|---|---|
 | `{{DAY_NUMBER}}` | integer | Phase 0 / `current_state` | Current session day (1-indexed, used for file naming + branch naming) |
-| `{{MILESTONE}}` | string | Phase 0 (scope derivation) | Next unbuilt milestone ID from roadmap (e.g. `M1.1`, `M1.2`) |
+| `{{MILESTONE}}` | string | Phase 0 (scope derivation) | Milestone ID — `M1.1`, `M2.4`, `M0.6`, `M5.7`, etc. |
 | `{{MILESTONE_TITLE}}` | string | Phase 0 (scope derivation) | Human-readable milestone description |
 | `{{SLUG}}` | string | Phase 1 (Architect) | kebab-case deliverable summary (e.g. `solution-scaffold`) |
 | `{{TASK_LIST}}` | ordered list | Phase 1 spec `## Implementation Plan` | Ordered commit units for Developer+QA |
@@ -93,6 +93,7 @@ git push origin main develop
 **Skills:** `skill_requirements_parser`, `skill_system_design`  
 **Inputs:**
 - `docs/platform_roadmap.md §Phase {{phase_plan}}` — milestone `{{MILESTONE}}` definition, acceptance criteria, component requirements
+- `docs/architecture/*.md` — pre-existing design specs (read for context; do not duplicate)
 - `.ai/current_state.md` — carry-forward items, dependency map, completed days context
 **Output:** `docs/architecture/day_{{DAY_NUMBER}}_spec.md`  
 **Sets:** `{{PARSER_OUTPUT}}`, `{{TASK_LIST}}`, `{{SLUG}}`
@@ -104,6 +105,7 @@ git push origin main develop
 - `## Implementation Plan (Commit Units)` — ordered list; each unit has: files, gate command, commit message
 - `## Success Checklist` — explicit pass/fail criteria (must map 1:1 to the roadmap acceptance criteria for `{{MILESTONE}}`)
 - `## Resilience Mandate` — circuit breaker config, fallback, async boundaries (or "N/A — not applicable this milestone" explicitly stated)
+- `## Depends on` — If the day's spec depends on entities, events, or contracts defined in a pre-existing design spec, it MUST cite the file path and milestone ID. If a pre-existing design spec references this milestone as a dependency, the day spec MUST resolve that dependency or flag it in `## Open Questions`.
 
 **Gate to Phase 2 — all must be true:**
 - [ ] `docs/architecture/day_{{DAY_NUMBER}}_spec.md` exists
@@ -273,3 +275,12 @@ Enforced at Phase 0:
 | 4b | Merged PR | `develop` branch squash commit |
 | 5 | Roadmap update | `docs/platform_roadmap.md` component status (✅ per completed component) |
 | 5 | Changelog Entry | `changelog/YYYY-MM-DD.md` |
+
+---
+
+## 9. Spec Taxonomy
+
+- **Kickstarter spec**: produced by Phase 1, gated by Phase 4b, merged via PR
+- **Design spec**: hand-authored (like Phase 04 / FastAPI), lives in `docs/architecture/`, NOT gated by Phase 4b
+- A kickstarter spec may reference a design spec in its `## Depends on` section
+- A design spec may anticipate a kickstarter spec but MUST NOT pre-empt it
