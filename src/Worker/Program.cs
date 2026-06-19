@@ -8,8 +8,10 @@ using Kendo.Shared.Resilience;
 using Kendo.UserService.Data;
 using Kendo.Worker;
 using Kendo.Worker.Data;
+using Kendo.Shared.Messaging.Events;
 using Kendo.Worker.Handlers;
 using Kendo.Worker.Services;
+using Kendo.Worker.Workers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Rebus.Handlers;
@@ -42,6 +44,10 @@ builder.Services.AddKendoGracefulShutdown(builder.Configuration);
 
 // Register Rebus handlers from the Worker assembly
 builder.Services.AddTransient<IHandleMessages<UserCreatedEvent>, UserCreatedEventHandler>();
+builder.Services.AddTransient<IHandleMessages<EventIngestedEvent>, EventIngestedHandler>();
+builder.Services.AddTransient<IHandleMessages<EventValidatedEvent>, EventValidatedHandler>();
+builder.Services.AddTransient<IHandleMessages<UserEmbeddingUpdatedEvent>, UserEmbeddingUpdatedHandler>();
+builder.Services.AddTransient<IHandleMessages<NotificationRequestedEvent>, NotificationRequestedHandler>();
 
 builder.Services.AddDbContext<WorkerDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -57,6 +63,11 @@ builder.Services.AddHttpClient("default")
 builder.Services.AddKendoRebusDlqConsumer(builder.Configuration);
 builder.Services.AddHostedService<WorkerBackgroundService>();
 builder.Services.AddHostedService<DlqDepthMonitor>();
+
+// Register AI handlers infrastructure
+builder.Services.AddKendoFastApiSummarizationClient(builder.Configuration);
+builder.Services.AddSingleton<NotificationDispatcherChannel>();
+builder.Services.AddHostedService<NotificationDispatcherHostedService>();
 
 var app = builder.Build();
 
