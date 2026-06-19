@@ -52,6 +52,82 @@ and the service-JWT minter reference both.
 
 ---
 
+## Architectural Transition (Before / After)
+
+```mermaid
+flowchart TB
+    subgraph BEFORE["Before (Phase 03 End State)"]
+        direction TB
+        A1["Angular Web App"] -->|HTTPS / Public| B1["NGINX (Reverse Proxy)"]
+        B1 --> C1["Gateway (.NET 10)"]
+        C1 --> D1["UserService"]
+        C1 --> E1["Worker"]
+        B1 -.-> F1["Redis / Cache"]
+        D1 --> G1["PostgreSQL + pgvector<br/>(User table only)"]
+        E1 -.->|kendo-events| H1["Azure Service Bus<br/>(UserCreatedEvent only)"]
+        style A1 fill:#e1f5fe,stroke:#01579b
+        style B1 fill:#e8eaf6,stroke:#283593
+        style C1 fill:#fff3e0,stroke:#e65100
+        style D1 fill:#e8f5e9,stroke:#1b5e20
+        style E1 fill:#fce4ec,stroke:#880e4f
+        style G1 fill:#fff8e1,stroke:#f57f17
+        style H1 fill:#f3e5f5,stroke:#4a148c
+    end
+
+    subgraph AFTER["After (M0.1 + M0.2 Implemented)"]
+        direction TB
+        A2["Angular Web App"] -->|HTTPS / Public| B2["NGINX (Reverse Proxy)"]
+        B2 --> C2["Gateway (.NET 10)"]
+        
+        subgraph NEW_GW["New Gateway Components"]
+            direction LR
+            CC1["RsaKeyProvider<br/>(RS256 keypair)"]
+            CC2["JwksEndpoint<br/>/.well-known/jwks.json"]
+            CC3["ServiceJwtMinter<br/>(admin:writes, 60s expiry)"]
+            CC4["IFastAPIClient<br/>(Polly Timeout+Retry+CB)"]
+            CC5["FastApiExceptionMapper<br/>(RFC 7807 bridge)"]
+        end
+        
+        subgraph NEW_CTRL["New Controllers + Middleware"]
+            direction LR
+            CT1["RagController<br/>(W1: /api/events/ingest)"]
+            CT2["UserSearchController<br/>(W3: /api/users/search)"]
+            CT3["AssistantController<br/>(W6: /api/assistant/ask)"]
+            CT4["IntentAdvisoryMiddleware<br/>(W4: advisory-only)"]
+        end
+        
+        C2 --> NEW_GW
+        C2 --> NEW_CTRL
+        NEW_CTRL --> D2["UserService<br/>(via internal HTTP)"]
+        NEW_CTRL -->|"kendo-events-ai"| E2["Worker"]
+        NEW_GW -->|"admin:writes JWT"| D2
+        
+        D2 --> G2["PostgreSQL + pgvector<br/>(new Event table)"]
+        E2 -.->|"kendo-events"| H2["Azure Service Bus<br/>(UserLifecycle)"]
+        E2 -.->|"kendo-events-ai"| H3["Azure Service Bus<br/>(AI Flow)"]
+        NEW_GW -.-> FF["FastAPI Service<br/>(Planned Phase 05)<br/>via IFastAPIClient"]
+        
+        style C2 fill:#fff3e0,stroke:#e65100
+        style CC1 fill:#ffe0b2,stroke:#e65100
+        style CC2 fill:#ffe0b2,stroke:#e65100
+        style CC3 fill:#ffe0b2,stroke:#e65100
+        style CC4 fill:#ffe0b2,stroke:#e65100
+        style CC5 fill:#ffe0b2,stroke:#e65100
+        style CT1 fill:#c8e6c9,stroke:#2e7d32
+        style CT2 fill:#c8e6c9,stroke:#2e7d32
+        style CT3 fill:#c8e6c9,stroke:#2e7d32
+        style CT4 fill:#c8e6c9,stroke:#2e7d32
+        style FF fill:#f0f4c3,stroke:#827717
+        style D2 fill:#e8f5e9,stroke:#1b5e20
+        style F2 fill:#fce4ec,stroke:#880e4f
+        style H3 fill:#f3e5f5,stroke:#4a148c
+    end
+
+    BEFORE -.->|"Phase 04 implements"| AFTER
+```
+
+---
+
 ## Layer Changes
 
 | Layer | Service | Change |
@@ -496,6 +572,21 @@ specifically for FastAPI failures — distinct from any DB or internal HTTP brea
 - **Rotation trigger:** the spec has `KENDO__JWT__ROTATION_DAYS` but no
   scheduled task to actually trigger rotation. Confirm whether a
   `BackgroundService` should be added, or whether rotation is manual.
+
+```mermaid
+flowchart LR
+    subgraph OQ["Open Questions — Day 17"]
+        Q1["IssuerSigningKeyResolver<br/>BuildServiceProvider() anti-pattern"]
+        Q2["JWKS endpoint<br/>AllowAnonymous acceptable?"]
+        Q3["Keypair storage<br/>PEM file vs K8s Secret vs Key Vault"]
+        Q4["User JWT issuance<br/>Scope: validation only vs /api/auth/login?"]
+        Q5["Service JWT audience<br/>kendo.api vs kendo.api.internal?"]
+        Q6["Rotation trigger<br/>BackgroundService vs manual?"]
+    end
+    
+    classDef question fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    class Q1,Q2,Q3,Q4,Q5,Q6 question
+```
 
 ---
 

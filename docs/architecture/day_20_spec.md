@@ -46,6 +46,87 @@ every other spec references the entities, migrations, and contracts defined here
 
 ---
 
+## Architectural Transition (Before / After)
+
+```mermaid
+flowchart TB
+    subgraph BEFORE["Before (Day 19 After State)"]
+        direction TB
+        A1["Angular Web App"] --> B1["Gateway (.NET 10)<br/>+ JWT + Controllers + Client"]
+        B1 --> C1["UserService<br/>(existing User + migrations)"]
+        B1 --> D1["Worker<br/>(4 AI handlers active)"]
+        C1 --> E1["PostgreSQL + pgvector<br/>(vector extension enabled,<br/>NO data in vector columns)"]
+        
+        style A1 fill:#e1f5fe,stroke:#01579b
+        style B1 fill:#fff3e0,stroke:#e65100
+        style C1 fill:#e8f5e9,stroke:#1b5e20
+        style D1 fill:#fce4ec,stroke:#880e4f
+        style E1 fill:#fff8e1,stroke:#f57f17
+    end
+
+    subgraph AFTER["After (M0.6 Implemented)"]
+        direction TB
+        A2["Angular Web App"] --> B2["Gateway (.NET 10)<br/>+ JWT + Controllers + Client"]
+        B2 --> C2["UserService"]
+        B2 --> D2["Worker"]
+        
+        subgraph NEW_ENT["New Entities (M0.6)"]
+            direction LR
+            E1a["Event<br/>(Id, Title, StartsAt, EndsAt,<br/>Location, Headcount,<br/>DietaryNotes, SourceText,<br/>IngestionStatus)"]
+            E1b["EventValidation<br/>(1:1 with Event,<br/>Ok, ConflictsJson,<br/>ReasoningTrace)"]
+            E1c["UserEmbedding<br/>(Sidecar table,<br/>UserId FK, ModelName,<br/>Vector column)"]
+            E1d["EventEmbedding<br/>(Sidecar table,<br/>EventId FK, Vector column)"]
+        end
+        
+        subgraph NEW_ROLE["Database Roles"]
+            R1["fastapi_ro<br/>(SELECT-only grants)"]
+            R2["userservice_writer<br/>(INSERT/UPDATE on new tables)"]
+        end
+        
+        subgraph NEW_API["New Controllers"]
+            API1["EventsController<br/>(GET /api/events)<br/>(POST /api/events)<br/>(PATCH/DELETE /api/events/{id})"]
+            API2["EmbeddingAdminController<br/>(POST /internal/embeddings)<br/>JWT admin:writes scope<br/>Scoped Npgsql connection"]
+        end
+        
+        subgraph NEW_MIG["3 New Migrations"]
+            M1["AddEventDomain<br/>(tables + indexes)"]
+            M2["AddFastAPIReadOnlyRole<br/>(fastapi_ro)"]
+            M3["AddEmbeddingAdminWriterRole<br/>(userservice_writer)"]
+        end
+        
+        C2 --- NEW_ENT
+        C2 --- NEW_ROLE
+        C2 --- NEW_MIG
+        C2 --- NEW_API
+        
+        NEW_ENT --> G2["PostgreSQL + pgvector<br/>(events, event_validations,<br/>event_embeddings,<br/>user_embeddings tables)"]
+        NEW_ROLE -.-> G2
+        
+        NEW_API -.->|"scoped connection"| G2
+        
+        style A2 fill:#e1f5fe,stroke:#01579b
+        style B2 fill:#fff3e0,stroke:#e65100
+        style C2 fill:#e8f5e9,stroke:#1b5e20
+        style D2 fill:#fce4ec,stroke:#880e4f
+        style E1a fill:#c8e6c9,stroke:#2e7d32
+        style E1b fill:#c8e6c9,stroke:#2e7d32
+        style E1c fill:#c8e6c9,stroke:#2e7d32
+        style E1d fill:#c8e6c9,stroke:#2e7d32
+        style R1 fill:#d1c4e9,stroke:#4527a0
+        style R2 fill:#d1c4e9,stroke:#4527a0
+        style API1 fill:#ffe0b2,stroke:#e65100
+        style API2 fill:#ffe0b2,stroke:#e65100
+        style M1 fill:#b2dfdb,stroke:#004d40
+        style M2 fill:#b2dfdb,stroke:#004d40
+        style M3 fill:#b2dfdb,stroke:#004d40
+        style G2 fill:#fff8e1,stroke:#f57f17
+    end
+
+    BEFORE -.->|"Day 20 implements"| AFTER
+```
+
+---
+
 ## Layer Changes
 
 | Layer | Service | Change |
@@ -412,6 +493,20 @@ The outbound resilience for the Gateway → FastAPI call lives in
   `DELETE` route description but not in the entity. Confirm whether the spec
   should add a `DeletedAt DateTimeOffset?` property to the entity, or use a
   hard delete for now.
+
+```mermaid
+flowchart LR
+    subgraph OQ["Open Questions — Day 20"]
+        Q1["Dimension enforcement?<br/>current_setting GUC vs<br/>two env-specific migrations"]
+        Q2["UserEmbedding storage?<br/>Sidecar table vs column on users table"]
+        Q3["token_use claim naming?<br/>(service vs user)"]
+        Q4["Outbox for Event creation?<br/>Atomic publish via Day 10 pattern?"]
+        Q5["Soft delete on Event?<br/>Add DeletedAt? column vs hard delete"]
+    end
+    
+    classDef question fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    class Q1,Q2,Q3,Q4,Q5 question
+```
 
 ---
 

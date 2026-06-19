@@ -48,6 +48,89 @@ JWT) because every handler references all three.
 
 ---
 
+## Architectural Transition (Before / After)
+
+```mermaid
+flowchart TB
+    subgraph BEFORE["Before (Day 18 After State)"]
+        direction TB
+        A1["Angular Web App"] --> B1["Gateway (.NET 10)<br/>+ JWT + Controllers"]
+        B1 --> C1["UserService"]
+        B1 -->|EventIngestedEvent| D1["Worker"]
+        C1 -->|UserEmbeddingUpdatedEvent| D1
+        C1 --> E1["PostgreSQL + pgvector"]
+        
+        subgraph EXIST_HAND["Existing Handlers"]
+            H1["UserCreatedEventHandler"]
+            H2["DeadLetterHandler"]
+            H3["DlqDepthMonitor<br/>(dual queue)"]
+        end
+        
+        D1 --- EXIST_HAND
+        D1 -.->|"kendo-events-ai"| F1["Azure Service Bus"]
+        
+        style A1 fill:#e1f5fe,stroke:#01579b
+        style B1 fill:#fff3e0,stroke:#e65100
+        style C1 fill:#e8f5e9,stroke:#1b5e20
+        style D1 fill:#fce4ec,stroke:#880e4f
+        style F1 fill:#f3e5f5,stroke:#4a148c
+    end
+    
+    subgraph AFTER["After (M0.5 Implemented)"]
+        direction TB
+        A2["Angular Web App"] --> B2["Gateway (.NET 10)<br/>+ JWT + Controllers"]
+        B2 --> C2["UserService"]
+        B2 -->|EventIngestedEvent| D2["Worker"]
+        C2 -->|UserEmbeddingUpdatedEvent| D2
+        C2 --> E2["PostgreSQL + pgvector"]
+        
+        subgraph NEW_HAND["4 New AI Handlers (M0.5)"]
+            direction TB
+            NH1["EventIngestedHandler<br/>Writes Event row + Embedding<br/>Emits EventValidatedEvent"]
+            NH2["EventValidatedHandler<br/>Calls FastAPI W2<br/>Persists EventValidation<br/>Emits NotificationRequestedEvent"]
+            NH3["UserEmbeddingUpdatedHandler<br/>First-embed → notification<br/>Reindex → audit log"]
+            NH4["NotificationRequestedHandler<br/>Calls FastAPI W7 (SSE)<br/>Collects rendered summary<br/>Sends to Dispatcher"]
+        end
+        
+        subgraph NEW_CLIENT["Worker → FastAPI Client"]
+            NC1["IFastAPISummarizationClient<br/>(separate Polly pipeline)"]
+            NC2["FastAPISummarizationClient<br/>(15s timeout, own CB)"]
+        end
+        
+        subgraph NEW_DISP["Notification Delivery"]
+            ND1["NotificationDispatcher<br/>BackgroundService"]
+            ND2["Channel<NotificationDispatchJob><br/>(in-memory)"]
+        end
+        
+        D2 --- NEW_HAND
+        D2 --- NEW_CLIENT
+        D2 --- NEW_DISP
+        
+        NEW_HAND -.->|"direct call"| C2
+        NEW_CLIENT -.->|"SSE /v1/notifications/summarize"| F2["FastAPI (Phase 05)"]
+        NEW_HAND -.->|"service JWT<br/>(admin:writes)"| C2
+        
+        NEW_DISP -.->|"future delivery<br/>(OOS)"| F3["Email / Push / In-App"]
+        
+        style A2 fill:#e1f5fe,stroke:#01579b
+        style B2 fill:#fff3e0,stroke:#e65100
+        style C2 fill:#e8f5e9,stroke:#1b5e20
+        style D2 fill:#fce4ec,stroke:#880e4f
+        style NH1 fill:#c8e6c9,stroke:#2e7d32
+        style NH2 fill:#c8e6c9,stroke:#2e7d32
+        style NH3 fill:#c8e6c9,stroke:#2e7d32
+        style NH4 fill:#c8e6c9,stroke:#2e7d32
+        style NC1 fill:#ffe0b2,stroke:#e65100
+        style NC2 fill:#ffe0b2,stroke:#e65100
+        style ND1 fill:#e1bee7,stroke:#4a148c
+        style F2 fill:#f0f4c3,stroke:#827717
+    end
+    
+    BEFORE -.->|"Day 19 implements"| AFTER
+```
+
+---
+
 ## Layer Changes
 
 | Layer | Service | Change |
@@ -477,6 +560,21 @@ the resilience pattern that future cross-service calls will follow.
   always creates a new row). Confirm whether `UserService` should accept
   an `Idempotency-Key` header on `POST /api/events` to make the call
   idempotent end-to-end. Recommended: yes, add the header in this spec.
+
+```mermaid
+flowchart LR
+    subgraph OQ["Open Questions — Day 19"]
+        Q1["Notification delivery contract?<br/>Leave as seam for future spec?"]
+        Q2["Worker → UserService direct call?<br/>Acceptable with service JWT?"]
+        Q3["FastAPI summarization timeout?<br/>15s spec vs 6s end-to-end budget"]
+        Q4["UserEmbeddingUpdatedEvent source?<br/>Outbox (recommended) vs direct send"]
+        Q5["Per-handler chaos tests?<br/>Defer to a future spec?"]
+        Q6["Idempotency-Key header<br/>on POST /api/events?"]
+    end
+    
+    classDef question fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    class Q1,Q2,Q3,Q4,Q5,Q6 question
+```
 
 ---
 

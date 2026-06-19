@@ -47,6 +47,92 @@ after `day_20_spec.md` (entities) because the message payloads reference the
 
 ---
 
+## Architectural Transition (Before / After)
+
+```mermaid
+flowchart TB
+    subgraph BEFORE["Before (Day 17 After State)"]
+        direction TB
+        A1["Angular Web App"] --> B1["Gateway (.NET 10)<br/>+ JWT Auth + Controllers"]
+        B1 --> C1["UserService"]
+        B1 --> D1["Worker"]
+        C1 --> E1["PostgreSQL + pgvector<br/>(events, embeddings, users)"]
+        D1 -.->|"kendo-events"| F1["Azure Service Bus<br/>(UserCreatedEvent only)"]
+        
+        subgraph EXIST_MSG["Existing Messaging"]
+            G1["KendoMessage<br/>(MessageId, CreatedAt, TraceContext)"]
+            H1["KendoMessageSerializer"]
+            I1["OutboxMessage<br/>(Day 10)"]
+            J1["IdempotencyRecords<br/>(Day 08)"]
+            K1["DlqDepthMonitor<br/>(Day 09)"]
+        end
+        D1 --- EXIST_MSG
+        
+        style A1 fill:#e1f5fe,stroke:#01579b
+        style B1 fill:#fff3e0,stroke:#e65100
+        style C1 fill:#e8f5e9,stroke:#1b5e20
+        style D1 fill:#fce4ec,stroke:#880e4f
+        style F1 fill:#f3e5f5,stroke:#4a148c
+    end
+    
+    subgraph AFTER["After (M0.3 + M0.4 Implemented)"]
+        direction TB
+        A2["Angular Web App"] --> B2["Gateway (.NET 10)<br/>+ JWT Auth + Controllers"]
+        B2 --> C2["UserService"]
+        B2 --> D2["Worker"]
+        C2 --> E2["PostgreSQL + pgvector<br/>(events, embeddings, users)"]
+        
+        subgraph NEW_EVENTS["4 New Event Types (M0.3)"]
+            direction LR
+            EV1["EventIngestedEvent<br/>(SourceText, StructuredJson, Embedding)"]
+            EV2["EventValidatedEvent<br/>(Ok, ConflictsJson, ReasoningTrace)"]
+            EV3["UserEmbeddingUpdatedEvent<br/>(UserId, Trigger, Dimensions)"]
+            EV4["NotificationRequestedEvent<br/>(UserId, TemplateId, Tone)"]
+        end
+        
+        subgraph NEW_TOPOLOGY["Queue Topology (M0.4)"]
+            direction TB
+            T1["KendoTopology Constants"]
+            T2["kendo-events<br/>(UserLifecycle)"]
+            T3["kendo-events-ai<br/>(AI Flow)"]
+            T4["kendo-events-fastapi<br/>(reserved)"]
+            T1 --- T2
+            T1 --- T3
+            T1 --- T4
+        end
+        
+        subgraph NEW_BUS["Rebus Configuration"]
+            R1["AddKendoRebusAiConsumer<br/>(2 workers, parallelism 5)"]
+            R2["AddKendoRebusAiProducer<br/>(one-way client)"]
+            R3["DlqDepthMonitor<br/>(dual queue polling)"]
+        end
+        
+        D2 --- NEW_EVENTS
+        D2 --- NEW_BUS
+        B2 ---|"publishes"| NEW_TOPOLOGY
+        C2 ---|"publishes"| NEW_TOPOLOGY
+        
+        NEW_TOPOLOGY -->|"user-lifecycle"| F2["Azure Service Bus<br/>kendo-events"]
+        NEW_TOPOLOGY -->|"ai-flows"| F3["Azure Service Bus<br/>kendo-events-ai<br/>(DLQ: $DeadLetterQueue)"]
+        NEW_EVENTS -.->|"routed via TypeBased()"| F3
+        
+        style A2 fill:#e1f5fe,stroke:#01579b
+        style B2 fill:#fff3e0,stroke:#e65100
+        style C2 fill:#e8f5e9,stroke:#1b5e20
+        style D2 fill:#fce4ec,stroke:#880e4f
+        style EV1 fill:#c8e6c9,stroke:#2e7d32
+        style EV2 fill:#c8e6c9,stroke:#2e7d32
+        style EV3 fill:#c8e6c9,stroke:#2e7d32
+        style EV4 fill:#c8e6c9,stroke:#2e7d32
+        style T3 fill:#c8e6c9,stroke:#2e7d32
+        style F3 fill:#f3e5f5,stroke:#4a148c
+    end
+
+    BEFORE -.->|"Day 18 implements"| AFTER
+```
+
+---
+
 ## Layer Changes
 
 | Layer | Service | Change |
@@ -381,6 +467,21 @@ The resilience policy for the **Worker → FastAPI** call (W7) is owned by
   dedicated test namespace, or whether we should use a local ASB
   emulator. (The existing tests use a real namespace; recommendation: keep
   the same.)
+
+```mermaid
+flowchart LR
+    subgraph OQ["Open Questions — Day 18"]
+        Q1["Outbox for EventIngestedEvent?<br/>Direct IBus.Send (Gateway)<br/>vs Outbox (UserService)"]
+        Q2["kendo-events-fastapi<br/>Reserve as placeholder or remove?"]
+        Q3["Event routing<br/>All 4 on one queue or split?"]
+        Q4["DLQ threshold<br/>Shared or dedicated for AI queue?"]
+        Q5["Backwards compatibility<br/>New events break old consumers?"]
+        Q6["ASB test container<br/>Real namespace vs emulator?"]
+    end
+    
+    classDef question fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    class Q1,Q2,Q3,Q4,Q5,Q6 question
+```
 
 ---
 
