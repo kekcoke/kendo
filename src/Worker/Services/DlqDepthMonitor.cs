@@ -1,28 +1,42 @@
 using Azure.Messaging.ServiceBus.Administration;
-using Microsoft.Extensions.Options;
+using Kendo.Shared.Messaging.Topology;
 
 namespace Kendo.Worker.Services;
 
 /// <summary>
-/// Periodic background service that monitors the Azure Service Bus Dead Letter Queue depth.
-/// When the depth exceeds the configured threshold, an alert-level log is emitted.
+/// Periodic background service that monitors Azure Service Bus Dead Letter Queue depths
+/// for both the user-lifecycle queue (<c>kendo-events</c>) and the AI flow queue
+/// (<c>kendo-events-ai</c>). When the depth of any queue exceeds the configured threshold,
+/// an alert-level log is emitted identifying which queue is affected.
 /// 
 /// Configuration (via appsettings.json or env vars):
-/// - Rebus__ConnectionString: ASB connection string (same as main Rebus config)
-/// - Rebus__DlqThreshold: threshold for alerting (default: 5)
-/// - Rebus__DlqPollingIntervalSeconds: polling interval (default: 60)
+/// - <c>Rebus__ConnectionString</c>: ASB connection string (same as main Rebus config)
+/// - <c>Rebus__DlqThreshold</c>: threshold for alerting (default: 5)
+/// - <c>Rebus__DlqPollingIntervalSeconds</c>: polling interval (default: 60)
 /// 
 /// The monitor gracefully skips initialization when the connection string is empty/missing.
+/// Per-queue alert state prevents alert storms: each queue has independent rate-limited
+/// dedup so a single queue spike does not suppress alerts on the other.
 /// </summary>
 public class DlqDepthMonitor : BackgroundService
 {
-    private const string QueueName = "kendo-events";
     private readonly string? _connectionString;
     private readonly int _threshold;
     private readonly int _pollingIntervalSeconds;
     private readonly ILogger<DlqDepthMonitor> _logger;
-    private int _lastAlertedDepth;
-    private bool _hasAlerted;
+
+    // Alert state per queue (independent dedup so one queue's spike doesn't suppress the other)
+    private sealed class QueueAlertState
+    {
+        public int LastAlertedDepth { get; set; }
+        public bool HasAlerted { get; set; }
+    }
+
+    private readonly Dictionary<string, QueueAlertState> _alertStates = new()
+    {
+        [KendoTopology.UserLifecycleQueue] = new QueueAlertState(),
+        [KendoTopology.AiFlowQueue] = new QueueAlertState(),
+    };
 
     public DlqDepthMonitor(
         IConfiguration configuration,
@@ -36,8 +50,6 @@ public class DlqDepthMonitor : BackgroundService
         if (_pollingIntervalSeconds <= 0) _pollingIntervalSeconds = 60; // default
 
         _logger = logger;
-        _lastAlertedDepth = 0;
-        _hasAlerted = false;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -51,70 +63,82 @@ public class DlqDepthMonitor : BackgroundService
         }
 
         _logger.LogInformation(
-            "DlqDepthMonitor: Starting with threshold={Threshold}, pollingInterval={Interval}s",
-            _threshold, _pollingIntervalSeconds);
+            "DlqDepthMonitor: Starting with threshold={Threshold}, pollingInterval={Interval}s. " +
+            "Monitoring queues: {Queues}",
+            _threshold, _pollingIntervalSeconds, string.Join(", ", _alertStates.Keys));
 
         var adminClient = new ServiceBusAdministrationClient(_connectionString);
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            try
+            await PollQueueDlqAsync(adminClient, KendoTopology.UserLifecycleQueue, stoppingToken);
+            await PollQueueDlqAsync(adminClient, KendoTopology.AiFlowQueue, stoppingToken);
+
+            await Task.Delay(TimeSpan.FromSeconds(_pollingIntervalSeconds), stoppingToken);
+        }
+    }
+
+    private async Task PollQueueDlqAsync(
+        ServiceBusAdministrationClient adminClient,
+        string queueName,
+        CancellationToken stoppingToken)
+    {
+        try
+        {
+            var runtimeProperties = await adminClient.GetQueueRuntimePropertiesAsync(
+                queueName, stoppingToken);
+
+            var dlqDepth = runtimeProperties.Value.DeadLetterMessageCount;
+            var state = _alertStates[queueName];
+
+            _logger.LogDebug(
+                "DlqDepthMonitor: {QueueName} DLQ depth = {DlqDepth}, threshold = {Threshold}",
+                queueName, dlqDepth, _threshold);
+
+            if (dlqDepth > _threshold)
             {
-                var runtimeProperties = await adminClient.GetQueueRuntimePropertiesAsync(
-                    QueueName, stoppingToken);
-
-                var dlqDepth = runtimeProperties.Value.DeadLetterMessageCount;
-
-                _logger.LogDebug(
-                    "DlqDepthMonitor: kendo-events DLQ depth = {DlqDepth}, threshold = {Threshold}",
-                    dlqDepth, _threshold);
-
-                if (dlqDepth > _threshold)
+                if (!state.HasAlerted || dlqDepth <= state.LastAlertedDepth)
                 {
-                    if (!_hasAlerted || dlqDepth <= _lastAlertedDepth)
-                    {
-                        // Fire alert: either first time above threshold, or depth increased
-                        _logger.LogError(
-                            "DLQ ALERT: kendo-events Dead Letter Queue depth ({DlqDepth}) " +
-                            "exceeds threshold ({Threshold}). " +
-                            "Investigate and drain the DLQ as soon as possible.",
-                            dlqDepth, _threshold);
+                    // Fire alert: either first time above threshold, or depth increased
+                    _logger.LogError(
+                        "DLQ ALERT: {QueueName} Dead Letter Queue depth ({DlqDepth}) " +
+                        "exceeds threshold ({Threshold}). " +
+                        "Investigate and drain the DLQ as soon as possible.",
+                        queueName, dlqDepth, _threshold);
 
-                        _lastAlertedDepth = (int)dlqDepth;
-                        _hasAlerted = true;
-                    }
-                    else
-                    {
-                        // Already alerted at this or higher depth — rate-limited
-                        _logger.LogWarning(
-                            "DLQ depth still elevated: {DlqDepth} (threshold={Threshold}). " +
-                            "Alert was already fired at depth {LastAlertedDepth}.",
-                            dlqDepth, _threshold, _lastAlertedDepth);
-                    }
+                    state.LastAlertedDepth = (int)dlqDepth;
+                    state.HasAlerted = true;
                 }
                 else
                 {
-                    if (_hasAlerted)
-                    {
-                        _logger.LogInformation(
-                            "DLQ depth dropped below threshold: {DlqDepth} <= {Threshold}. " +
-                            "Resetting alert state.",
-                            dlqDepth, _threshold);
-                    }
-
-                    _lastAlertedDepth = 0;
-                    _hasAlerted = false;
+                    // Already alerted at this or higher depth — rate-limited
+                    _logger.LogWarning(
+                        "DLQ depth still elevated: {QueueName} depth={DlqDepth} (threshold={Threshold}). " +
+                        "Alert was already fired at depth {LastAlertedDepth}.",
+                        queueName, dlqDepth, _threshold, state.LastAlertedDepth);
                 }
             }
-            catch (Exception ex)
+            else
             {
-                _logger.LogWarning(
-                    ex,
-                    "DlqDepthMonitor: Failed to query DLQ depth for kendo-events. " +
-                    "Will retry on next polling interval.");
-            }
+                if (state.HasAlerted)
+                {
+                    _logger.LogInformation(
+                        "DLQ depth dropped below threshold: {QueueName} depth={DlqDepth} <= {Threshold}. " +
+                        "Resetting alert state.",
+                        queueName, dlqDepth, _threshold);
+                }
 
-            await Task.Delay(TimeSpan.FromSeconds(_pollingIntervalSeconds), stoppingToken);
+                state.LastAlertedDepth = 0;
+                state.HasAlerted = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "DlqDepthMonitor: Failed to query DLQ depth for {QueueName}. " +
+                "Will retry on next polling interval.",
+                queueName);
         }
     }
 }
