@@ -1,0 +1,1 @@
+"""Resilience module — circuit breaker and retry for external dependencies."""

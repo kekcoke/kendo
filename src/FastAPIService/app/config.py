@@ -46,3 +46,19 @@ class Settings(BaseSettings):
     # --- Embedding model ---
     embedding_model: str = "BGE-large-en-v1.5"
     embedding_dimension: int = 1024
+
+    # --- Resilience (pybreaker) ---
+    breaker_pgvector_fail_max: int = 3
+    breaker_pgvector_reset_timeout: int = 30  # seconds
+    breaker_openai_fail_max: int = 3
+    breaker_openai_reset_timeout: int = 30  # seconds
+
+    # --- Resilience (tenacity) ---
+    retry_max_attempts: int = 3
+    retry_min_wait: float = 1.0
+    retry_max_wait: float = 30.0
+    retry_multiplier: float = 2.0
+
+    # --- OpenTelemetry ---
+    otel_service_name: str = "kendo-fastapi"
+    otel_exporter_otlp_endpoint: str = ""  # empty = console exporter fallback
