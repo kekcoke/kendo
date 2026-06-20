@@ -1,4 +1,5 @@
 using Kendo.Shared.Authentication;
+using static Kendo.Shared.Authentication.AdminScopePoliciesExtensions;
 using Kendo.Shared.Caching;
 using Kendo.Shared.ErrorHandling;
 using Kendo.Shared.Http;
@@ -8,6 +9,7 @@ using Kendo.Shared.GracefulShutdown;
 using Kendo.Shared.RateLimiting;
 using Kendo.Shared.Resilience;
 using Kendo.Gateway.Middleware;
+using Kendo.Gateway.Infrastructure.Auth;
 using Kendo.Gateway.WellKnown;
 using Microsoft.AspNetCore.Mvc;
 
@@ -25,6 +27,12 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 
 // JWT authentication
 builder.Services.AddKendoJwt(builder.Configuration);
+
+// Token issuance service (user JWT minting)
+builder.Services.AddSingleton<ITokenService, TokenService>();
+
+// Key rotation background service
+builder.Services.AddHostedService<KeyRotationBackgroundService>();
 
 // Authorization policies (shared with day_20)
 builder.Services.AddKendoAdminScopePolicies();

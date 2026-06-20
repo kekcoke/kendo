@@ -15,7 +15,7 @@
 - **Explicitly out of scope:**
   - W2 (M5.8 — Event Conflict Reasoning) — handled in Day 29
   - W8 (M5.14 — Eval Gate) — prerequisite noted, must be live on `develop` before this ships to prod
-  - User-facing token issuance (resolved by Day 27 / CF-2)
+  - User-facing token issuance (resolved by Day 26 / CF-2)
 
 ---
 
@@ -125,7 +125,7 @@ Per `fastapi_rag_service_spec.md`:
 ## Depends on
 
 - `docs/architecture/fastapi_rag_service_spec.md §W1` — data contracts, acceptance gates, LLM chain design
-- Day 27 (CF-2) — Gateway JWKS contract frozen; key rotation active
-- Day 26 (CF-1) — CI chaos tests stable
+- Day 26 (CF-2) — Gateway JWKS contract frozen; key rotation active
+- Day 27 (CF-1) — CI chaos tests stable
 - `src/Gateway/Services/IFastAPIClient.cs` — existing interface, extended with `IngestAsync`
 - `src/Gateway/Controllers/RagController.cs` — existing controller, extended with new route

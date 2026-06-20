@@ -21,7 +21,7 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 > Replaced each session. 3-bullet hand-off note for the next run.
 
 * **M5.6 complete** — FastAPI foundation sealed: token-bucket rate limiter per JWT subject (429 + Retry-After), 4-scenario chaos test suite (DB down, LLM down, crash, slow stream), consolidated `ops/runbooks/fastapi_service.md` incident playbook, CI pipeline integration (chaos-test job). PR #31 squash-merged into `develop`.
-* **Phase 05 foundation complete** — All M5.1–M5.6 milestones now ✅. 12/12 Phase 05 components delivered (scaffold, RAG, pgvector, Gateway routing, resilience parity, observability + chaos + runbook). Next: M5.7 — W1 Event Ingestion RAG (first P0 workload).
+* **Phase 05 foundation complete** — All M5.1–M5.6 milestones now ✅. 12/12 Phase 05 components delivered (scaffold, RAG, pgvector, Gateway routing, resilience parity, observability + chaos + runbook). Next: CF-2 — Gateway JWT Auth Refactor (Day 26), then CF-1 — Chaos Test CI Flakiness Fix (Day 27), then M5.7 — W1 Event Ingestion RAG (Day 28+).
 * Carry-forward maintained: chaos-test CI flakiness (`test_db_downtime`) — documented in `ops/runbooks/fastapi_service.md` §Known CI Flakiness. Day 17 open questions (IssuerSigningKeyResolver refactor, no user JWT issuance, no rotation BackgroundService) carried forward.
 
 ---

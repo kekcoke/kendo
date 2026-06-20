@@ -1,24 +1,21 @@
-# Architecture Spec — Day 27 — Gateway JWT Auth Refactor
+# Architecture Spec — Day 27 — Chaos Test CI Flakiness Fix
 
-> **Carry-forward resolution:** CF-2 — `IssuerSigningKeyResolver` anti-pattern, user JWT issuance, key rotation  
+> **Carry-forward resolution:** CF-1 — `test_db_downtime` intermittent failure  
 > **Roadmap phase:** 05 — AI/Vector Service (FastAPI)  
 > **Date:** 2026-06-20  
-> **Type:** Remediation spec — refactoring existing .NET auth code  
-> **Depends on:** `docs/architecture/day_17_spec.md` (original JWT auth spec)
+> **Type:** Remediation spec — no new architectural contracts  
+> **Depends on:** `ops/runbooks/fastapi_service.md` §Known CI Flakiness
 
 ---
 
 ## Milestone Scope
 
-- **What:** Three refactors to the Gateway JWT auth layer from Day 17's open questions:
-  1. Replace `IssuerSigningKeyResolver`'s `BuildServiceProvider()` anti-pattern with a closure-based DI pattern
-  2. Add user JWT issuance endpoint (`POST /api/auth/token`) — currently only validation exists
-  3. Add `KeyRotationBackgroundService` — currently key rotation is manual only
-- **Why now:** FastAPI workload (M5.7+) validates JWTs against the Gateway's JWKS endpoint. If the key resolver or JWKS schema changes after W1 ships, FastAPI breaks. Freeze the contract before workloads land.
+- **What:** Fix the `test_db_downtime` chaos test that intermittently returns `000000` (connection refused) instead of expected 503 in CI.
+- **Root cause (suspected):** Race condition between `docker compose unpause` completing and the PostgreSQL health check re-evaluating. The test sends a query before PG is fully resumed.
 - **Explicitly out of scope:**
-  - New workload endpoints (M5.7+)
-  - User registration / identity management (remains external)
-  - mTLS or service-token auth (future from M5.11 spec direction)
+  - Any application code changes (no .NET or Python changes)
+  - `IssuerSigningKeyResolver` refactor (handled by Day 26 / CF-2)
+  - New chaos scenarios
 
 ---
 
@@ -26,118 +23,51 @@
 
 | Layer | Service | Change |
 |-------|---------|--------|
-| Application | `src/Gateway/` | Refactor `IssuerSigningKeyResolver` to closure-based pattern |
-| Application | `src/Gateway/` | Add `POST /api/auth/token` user JWT issuance endpoint |
-| Application | `src/Gateway/` | Add `KeyRotationBackgroundService` for automatic key rotation |
+| CI | `scripts/chaos/test_db_downtime.sh` | Add retry loop with health-check polling after `docker compose unpause` before asserting 503 |
 
 ---
 
 ## Data Contracts
 
-### New endpoint: `POST /api/auth/token` — Issue user JWT
-
-**Request:**
-```json
-{
-  "user_id": "uuid",
-  "roles": ["string"],
-  "ttl_seconds": 3600
-}
-```
-
-**Response — 200 OK:**
-```json
-{
-  "access_token": "string (JWT, RS256)",
-  "token_type": "Bearer",
-  "expires_in": 3600
-}
-```
-
-**Error responses:** Standard RFC 7807 — `400` (invalid request), `401` (Gateway service-JWT required).
-
-**Auth:** Endpoint itself is protected by a Gateway service-JWT scope (`admin:token`). Only Worker and UserService can mint user tokens via this endpoint. User-facing token issuance is out of scope.
-
-### Key rotation contract (unchanged from Day 17):
-
-- Rotation schedule: `KENDO__JWT__ROTATION_DAYS` (default 90 days)
-- Overlap window: 2-key overlap during rotation — new key is primary for signing, old key remains in JWKS for token validation until expiry
-- JWKS endpoint: `/.well-known/jwks.json` — schema unchanged (RFC 7517)
+N/A — no API or message contract changes. This is a bash-script + CI-assertion fix only.
 
 ---
 
 ## Implementation Plan (Commit Units)
 
-### Unit 1 — Refactor IssuerSigningKeyResolver (closure-based DI)
+### Unit 1 — Fix PG-downtime chaos test flakiness
 
 **Files:**
-- `src/Gateway/Infrastructure/Auth/IssuerSigningKeyResolver.cs`
-- `src/Gateway/Infrastructure/Auth/RsaKeyProvider.cs`
+- `scripts/chaos/test_db_downtime.sh`
 
-**Change summary:** Remove `BuildServiceProvider()` anti-pattern. Inject `IServiceProvider` or `IConfiguration` + `IRsaKeyProvider` directly via constructor. The resolver becomes a standard DI-registered singleton with a closure over the injected services.
+**Change summary:** After `docker compose unpause postgres`, replace the single `curl` assertion with a retry loop that polls `docker compose exec postgres pg_isready` (up to 15s, 1s interval) before asserting the 503. This matches mitigation #2 from `ops/runbooks/fastapi_service.md` §Known CI Flakiness.
 
-**Gate command:** `dotnet test tests/Kendo.Tests --filter "Category=Auth"` — all auth tests pass.
+**Reference implementation (logic to apply):**
+```bash
+# After: docker compose unpause postgres
+# Before asserting 503, wait for PG to be healthy
+RETRIES=15
+until docker compose exec -T postgres pg_isready -q 2>/dev/null || [ $RETRIES -eq 0 ]; do
+  sleep 1
+  RETRIES=$((RETRIES - 1))
+done
+```
+
+**Gate command:** `scripts/chaos/run_all.sh` — must exit 0 with no `000000` failures in the DB-downtime scenario (run 3x locally to verify non-flakiness).
+
+**Regression guard:** Run the FastAPI chaos suite (`pytest tests/fastapi/ --chaos`) to confirm no FastAPI chaos tests were broken by the script change.
 
 **Commit message:**
 ```
-refactor(gateway): replace IssuerSigningKeyResolver BuildServiceProvider with closure-based DI
+fix(chaos): add pg_isready retry loop after unpause to eliminate test_db_downtime flakiness
 
-Injects IServiceProvider and IRsaKeyProvider via constructor instead of calling
-BuildServiceProvider() at runtime. Eliminates the anti-pattern flagged in Day 17 open
-questions. JWKS endpoint contract unchanged.
+Resolves CF-1 (Day 13/15/16 carry-forward). After `docker compose unpause postgres`,
+poll pg_isready (up to 15s, 1s interval) before asserting 503. Eliminates the race
+condition where curl fires before PG connection pool reopens.
 
-Day 27 — CF-2 Unit 1 of 3 | Milestone: CF-2 (carry-forward)
-Coverage: 100% auth tests passing
-Lint: clean
-```
-
-### Unit 2 — Add user JWT issuance endpoint
-
-**Files:**
-- `src/Gateway/Controllers/TokenController.cs` — new
-- `src/Gateway/Infrastructure/Auth/TokenService.cs` — new
-- `src/Gateway/Infrastructure/Auth/ITokenService.cs` — new interface
-
-**Change summary:** Implement `POST /api/auth/token` that accepts a `{ user_id, roles, ttl_seconds }` body, validates the caller has the `admin:token` scope, mints a JWT with the Gateway's private key, and returns the token. Uses the same `RsaKeyProvider` as the existing auth pipeline.
-
-**Gate command:** `dotnet test tests/Kendo.Tests --filter "Category=Auth"` — includes new token-issuance tests (≥ 5: happy path, expired caller, insufficient scope, invalid body, ttl bounds).
-
-**Commit message:**
-```
-feat(gateway): add POST /api/auth/token user JWT issuance endpoint
-
-Mints RS256 JWTs signed with the Gateway's private key. Protected by admin:token
-scope — only service JWTs can mint user tokens. Same key provider as existing
-JWT validation and JWKS endpoint. Resolves Day 17 open question: user JWT issuance
-(previously validation-only).
-
-Day 27 — CF-2 Unit 2 of 3 | Milestone: CF-2 (carry-forward)
-Coverage: 100% (≥5 new token tests)
-Lint: clean
-```
-
-### Unit 3 — Add KeyRotationBackgroundService
-
-**Files:**
-- `src/Gateway/Infrastructure/Auth/KeyRotationBackgroundService.cs` — new
-- `src/Gateway/Infrastructure/Auth/RsaKeyProvider.cs` (modified — add rotation method)
-
-**Change summary:** Implement a `BackgroundService` that checks the keypair's age on a periodic timer (check interval default 1h, rotation threshold from `KENDO__JWT__ROTATION_DAYS`). When a keypair exceeds the threshold, generates a new RSA-2048 keypair, persists it, and publishes the new public key to the JWKS endpoint. During the overlap window, both old and new keys appear in the JWKS response. Old key is removed from JWKS after the overlap window expires.
-
-**Gate command:** `dotnet test tests/Kendo.Tests --filter "Category=Auth"` — includes rotation tests (key generated after threshold, overlap window, old key removed after expiry).
-
-**Commit message:**
-```
-feat(gateway): add KeyRotationBackgroundService for automatic JWK rotation
-
-Automatically rotates RSA-2048 keypair on KENDO__JWT__ROTATION_DAYS schedule
-(default 90d). Two-key overlap window ensures tokens signed with the old key
-remain valid during rotation. JWKS endpoint (/.well-known/jwks.json) updated
-atomically. Resolves Day 17 open question (previously manual-only).
-
-Day 27 — CF-2 Unit 3 of 3 | Milestone: CF-2 (carry-forward)
-Coverage: 100% (≥5 new rotation tests)
-Lint: clean
+Day 27 — CF-1 | Milestone: CF-1 (carry-forward)
+Coverage: N/A (bash script only)
+Lint: N/A
 ```
 
 ---
@@ -146,25 +76,20 @@ Lint: clean
 
 | # | Criterion | Maps to |
 |---|-----------|---------|
-| 1 | `IssuerSigningKeyResolver` no longer calls `BuildServiceProvider()` | CF-2 resolution |
-| 2 | `POST /api/auth/token` returns valid RS256 JWT with correct claims | CF-2 resolution |
-| 3 | Token issuances with expired/invalid caller JWT return 403 RFC 7807 | Security baseline |
-| 4 | `KeyRotationBackgroundService` generates new keypair at threshold and publishes to JWKS | CF-2 resolution |
-| 5 | Old key remains in JWKS during overlap window; removed after window expires | CF-2 resolution |
-| 6 | FastAPI JWKS validation client (existing) still passes with the refactored JWKS endpoint | Regression guard — test with FastAPI integration |
-| 7 | All Phase 01–05 foundation acceptance criteria still pass | Inherited |
+| 1 | `scripts/chaos/test_db_downtime.sh` runs cleanly in local Docker Compose 3x without `000000` failure | CF-1 resolution |
+| 2 | FastAPI chaos suite (`pytest tests/fastapi/ --chaos`) still passes after script change | Regression guard |
+| 3 | No `000000` entries appear in CI chaos-test job artifacts after the fix | CF-1 resolution |
+| 4 | Entry removed from `current_state.md` §Carry-Forward Items post-merge | State update |
 
 ---
 
 ## Resilience Mandate
 
-- Key rotation BackgroundService has a retry loop for persistence failures (3 retries, 10s delay) — a failed rotation retries on the next check interval
-- Token issuance endpoint uses the same `HttpContext.RequestAborted` cancellation as existing controllers
-- No new circuit breaker or retry policies needed — this is Gateway-internal auth logic, not an external dependency call
+N/A — the fix makes the test more robust against timing variability. No production resilience change.
 
 ---
 
 ## Depends on
 
-- `docs/architecture/day_17_spec.md` — original JWT auth spec; this spec refactors it but preserves all contracts
-- `src/Gateway/Infrastructure/Auth/` — the directory containing all files to be modified
+- `ops/runbooks/fastapi_service.md` §Known CI Flakiness — documents the mitigation approach this spec implements
+- `scripts/chaos/test_db_downtime.sh` — the file being modified
