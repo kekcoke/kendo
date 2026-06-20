@@ -2,19 +2,20 @@
 
 Provides:
 - eval_settings: fixture for eval configuration
-- metric_factory: creates DeepEval metric instances
+- metrics_available: bool fixture — True if OPENAI_API_KEY is set
+- metric_factory: creates DeepEval metric instances (or None if unavailable)
 - load_eval_dataset: loads golden dataset from tests/fastapi/eval/datasets/
 """
 
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from deepeval.metrics import AnswerRelevancyMetric, FaithfulnessMetric, HallucinationMetric
 from deepeval.test_case import LLMTestCase
 
 # ---------------------------------------------------------------------------
@@ -30,10 +31,25 @@ BASELINE_DIR = EVAL_DIR / "baseline"
 def eval_settings() -> dict[str, Any]:
     """Shared eval configuration."""
     return {
-        "regression_threshold": 0.05,  # 5% max regression vs baseline
+        "regression_threshold": 0.05,
         "datasets_dir": str(DATASET_DIR),
         "baselines_dir": str(BASELINE_DIR),
     }
+
+
+# ---------------------------------------------------------------------------
+# Metric availability
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def metrics_available() -> bool:
+    """Check if LLM evaluation is available (API key configured).
+
+    DeepEval metrics require OPENAI_API_KEY. When unavailable, tests
+    skip gracefully rather than hard-failing.
+    """
+    return bool(os.environ.get("OPENAI_API_KEY"))
 
 
 # ---------------------------------------------------------------------------
@@ -42,12 +58,17 @@ def eval_settings() -> dict[str, Any]:
 
 
 @pytest.fixture(scope="session")
-def metric_factory() -> dict[str, Any]:
+def metric_factory(metrics_available: bool) -> dict[str, Any]:
     """Create DeepEval metric instances for the W8 eval suite.
 
-    Returns a dict of metric_name -> metric_instance so tests can
-    reference them by name. Metrics wrap deepeval's built-in scorers.
+    If OPENAI_API_KEY is not configured, returns an empty dict so
+    consuming tests can skip gracefully.
     """
+    if not metrics_available:
+        return {}
+
+    from deepeval.metrics import AnswerRelevancyMetric, FaithfulnessMetric, HallucinationMetric
+
     return {
         "faithfulness": FaithfulnessMetric(threshold=0.7, model="gpt-4o-mini"),
         "answer_relevancy": AnswerRelevancyMetric(threshold=0.7, model="gpt-4o-mini"),
@@ -61,17 +82,9 @@ def metric_factory() -> dict[str, Any]:
 
 
 def discover_datasets() -> list[Path]:
-    """Discover all JSON dataset files in the datasets directory.
-
-    Each dataset file is a JSON array of test cases with fields:
-      - input: str (the user query or event text)
-      - actual_output: str (the LLM response)
-      - expected_output: str (the golden / ideal response)
-      - retrieval_context: list[str] (contexts retrieved by the RAG pipeline)
-    """
+    """Discover all JSON dataset files in the datasets directory."""
     if not DATASET_DIR.exists():
         return []
-
     return sorted(DATASET_DIR.glob("*.json"))
 
 

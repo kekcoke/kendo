@@ -1,7 +1,7 @@
 # Infraspekt — Current State
 > **Live checkpoint.** Updated by the Orchestrator at the end of every phase.  
 > Rule: never truncate history. Append only — except `## Last Session Summary` and `## Active Infrastructure Snapshot` (full replacements).  
-> Last updated: 2026-06-20 (Day 27) — Phase 5 sealed
+> Last updated: 2026-06-20 (Day 28) — Phase 5 sealed (conditional PASS)
 
 ---
 
@@ -11,7 +11,7 @@
 current_day: 28
 current_phase: 0        # Phase 0 ready for next session
 branch_base: develop
-feature_branch: TBD  # resolved by next session Phase 1 {{SLUG}}
+feature_branch: feature/day-28-w1-event-ingestion  # conditional PASS — merge blocked on M5.14
 phase_plan: "05"        # AI/Vector Service (FastAPI)
 ```
 
@@ -20,9 +20,9 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* **CF-1 complete** — chaos-test CI flakiness (`test_db_downtime`) resolved: pg_isready retry loop added after `docker compose unpause` to eliminate race condition. PR #34 squash-merged to `develop`. Both CF-1 and CF-2 carry-forwards now resolved.
-* **All carry-forwards cleared.** All Day 17 open questions resolved (user JWT issuance, key rotation, IssuerSigningKeyResolver refactor). Chaos-test flakiness fixed.
-* **Next: M5.7 — W1 Event Ingestion RAG (first P0 workload).** JWKS contract frozen, CI stable.
+* **Day 28 (M5.7) implemented** — W1 Event Ingestion RAG: `POST /v1/rag/ingest` on FastAPI, proxied via Gateway `POST /api/events/ingest`. 9 Python tests + 5 .NET integration tests all green. Conditional PASS — branch on `origin`, merge blocked on M5.14 (W8).
+* **Next: Day 29 — M5.14 (W8) Evaluation & Regression Gate.** Must ship to `develop` before W1 can merge. Case C spec (no pre-authored day spec).
+* **After: Day 30 — Rebase + merge W1** with W1 eval dataset wired into W8 suite.
 
 ---
 
@@ -305,7 +305,7 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 > Tasks started this day but halted (lint/test failure, spec ambiguity, reviewer FAIL routing).  
 > **Must be empty before Day N+1 can begin.** Populated by Reviewer FAIL verdict or commit-gate halt.
 
-- (none)
+- (none — conditional PASS, no FAIL verdict issued)
 
 ---
 
@@ -321,7 +321,9 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 ## Carry-Forward Items
 > Open blockers, homework, and unresolved decisions. Remove when resolved; append when new ones arise.
 
-- *(none — all carry-forwards from Days 13-17 resolved)*
+- *(none — all carry-forwards resolved)*
+- **CF-28.1:** W1 branch (`feature/day-28-w1-event-ingestion`) on `origin` awaiting M5.14 merge before rebase+merge to `develop`
+- **CF-28.2:** W1 eval dataset (to be wired into W8 suite on merge day — Day 30)
 
 ---
 
@@ -358,6 +360,7 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 | 23 | Gateway → FastAPI RAG Routing (M5.4) | IFastAPIClient.RagQueryAsync/RagQueryStreamAsync, GET /api/rag/query + /api/rag/stream, 5 unit tests; 6 files, 506 additions; no Python changes | PR #29 squash-merged to `develop` | ✅ |
 | 24 | FastAPI Resilience Parity (M5.5) | pybreaker CB (pgvector + OpenAI), tenacity retry (DB + LLM, 4xx exclusion), OTel tracing (OTLP/console, trace_id, traceparent), 18 unit tests; 26 files, ~1130 additions; Python-only | PR #30 squash-merged to `develop` | ✅ |
 | 25 | FastAPI Observability + Chaos + Runbook (M5.6) | Token-bucket rate limiter per JWT subject (429 + Retry-After), 4-scenario chaos test suite (DB down, LLM down, crash, slow stream), `ops/runbooks/fastapi_service.md` incident playbook, CI FastAPI chaos-test job; 23 files, 1179 additions; 11 rate-limit tests + 4 chaos test files | PR #31 squash-merged to `develop` | ✅ |
+| 28 | W1 Event Ingestion RAG (M5.7) | FastAPI `POST /v1/rag/ingest`, Gateway `POST /api/events/ingest`, IngestChain with chunk→embed→retrieve→LLM pipeline, 9 Python tests, 5 .NET W1 integration tests, Day 28 runbook | Conditional PASS — branch `feature/day-28-w1-event-ingestion` on `origin`, merge blocked on M5.14 per P0 ordering rule | ⏳ (conditional) |
 
 ---
 

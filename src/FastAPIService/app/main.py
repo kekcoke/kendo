@@ -101,4 +101,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(rag_router)
 
+    # W1 — Event Ingestion RAG route (M5.7)
+    from app.api.v1.ingest import router as ingest_router
+
+    app.include_router(ingest_router)
+
     return app

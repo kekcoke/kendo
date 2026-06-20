@@ -331,7 +331,7 @@ that drives implementation is `docs/architecture/fastapi_rag_service_spec.md`.
 | `FastAPI Runbook` | `ops/runbooks/fastapi_service.md` — consolidated playbook (Azure OpenAI outage, pgvector failover, crash loop, JWKS rotation) | ✅ (Day 25) |
 | `FastAPI Dockerfile` | Multi-stage `python:3.12-slim`, non-root user, health check | ✅ (Day 21) |
 | `docker compose` (FastAPI service) | Internal-network port `8000`, health check wired to Docker, ≥ 2 replicas when Phase 03 HA standards apply | ✅ (Day 21) |
-| **W1 — Event Ingestion RAG** (M5.7) | `POST /api/events/ingest` — free-form text → structured `Event` JSON via LangChain + pgvector retrieval | ~ (planned) |
+| **W1 — Event Ingestion RAG** (M5.7) | `POST /api/events/ingest` — free-form text → structured `Event` JSON via LangChain + pgvector retrieval | ~ (conditional PASS, merge blocked on M5.14) |
 | **W2 — Event Conflict & Schedule Reasoning** (M5.8) | `POST /api/events/{id}/validate` — multi-step reasoning tool-use, audit trace returned | ~ (planned) |
 | **W3 — User Profile Semantic Search** (M5.9) | `GET /api/users/search?q=...` — hybrid pgvector cosine + Postgres BM25 | ~ (planned) |
 | **W4 — User Intent Classification** (M5.10) | Advisory router at Gateway, ≤ 80ms p95, hard-coded fallback in .NET | ~ (planned) |
