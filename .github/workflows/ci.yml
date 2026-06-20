@@ -201,3 +201,55 @@ jobs:
       - name: Tear down
         if: always()
         run: docker compose down
+
+  eval-gate:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/develop')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: src/FastAPIService/pyproject.toml
+
+      - name: Install dependencies
+        working-directory: src/FastAPIService
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --upgrade pip setuptools wheel
+          .venv/bin/pip install -e .
+
+      - name: Check if eval-relevant files changed
+        id: path-check
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="HEAD~1"
+            HEAD="HEAD"
+          fi
+          if git diff --name-only "$BASE" "$HEAD" | grep -qE '^src/FastAPIService/|^tests/fastapi/eval/'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run W8 eval gate — DeepEval + Ragas regression suite
+        if: steps.path-check.outputs.changed == 'true'
+        working-directory: src/FastAPIService
+        run: |
+          .venv/bin/python -m pytest tests/fastapi/eval/ -v --junitxml=eval-report.xml
+
+      - name: Upload eval gate results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-gate-results
+          path: src/FastAPIService/eval-report.xml

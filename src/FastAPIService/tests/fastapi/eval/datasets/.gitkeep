@@ -1,0 +1,11 @@
+# Golden eval datasets — one JSON file per workload
+#
+# Each file is a JSON array of test cases with fields:
+#   - input: str              (user query / event text)
+#   - actual_output: str      (LLM response to evaluate)
+#   - expected_output: str    (golden / ideal response)
+#   - retrieval_context: [str] (contexts retrieved by RAG pipeline)
+#
+# Datasets are added by each workload on merge:
+#   - Day 30: W1 event ingestion dataset
+#   - Day 31+: W2, W3, W6 datasets
