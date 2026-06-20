@@ -1,21 +1,21 @@
-# Architecture Spec — Day 34 — W7: Event Notification Summarization
+# Architecture Spec — Day 33 — W6: Document Q&A / Onboarding Assistant
 
-> **Milestone:** M5.13 — W7 Event Notification Summarization (P2)  
+> **Milestone:** M5.12 — W6 Document Q&A / Onboarding Assistant (P2)  
 > **Roadmap phase:** 05 — AI/Vector Service (FastAPI)  
 > **Date:** 2026-06-20  
-> **Type:** Workload spec (adopts by reference `fastapi_rag_service_spec.md §W7`)  
-> **Depends on:** `docs/architecture/fastapi_rag_service_spec.md` §W7 (design-spec contract, rev 2026-06-16), `docs/architecture/day_19_spec.md` (Worker AI handlers + IFastAPISummarizationClient)
+> **Type:** Workload spec (adopts by reference `fastapi_rag_service_spec.md §W6`)  
+> **Depends on:** `docs/architecture/fastapi_rag_service_spec.md` §W6 (design-spec contract, rev 2026-06-16)
 
 ---
 
 ## Milestone Scope
 
-- **What:** Implement W7 — Worker calls FastAPI directly (not through Gateway) to generate personalized event notification summaries. FastAPI SSE streams back the rendered notification body. Worker delivers via existing channel (email/push/in-app).
-- **Maps to:** `fastapi_rag_service_spec.md §W7 — Event Notification Summarization` (data contracts, acceptance gates)
+- **What:** Implement W6 — an internal document Q&A tool. `POST /api/assistant/ask` on the Gateway proxies to FastAPI `/v1/assistant/ask`. FastAPI ingests the project corpus (`docs/architecture/`, `ops/runbooks/`, `templates/skills/`, `changelog/`, `.ai/orchestration.md`) into a local vector index. Queries return cited answers (source file + line range).
+- **Maps to:** `fastapi_rag_service_spec.md §W6 — Document Q&A / Onboarding Assistant` (data contracts, acceptance gates)
 - **Explicitly out of scope:**
-  - W6 (already live from Day 33)
-  - Notification delivery channel (Worker handles this)
-  - Replacing existing templated notifications — W7 adds LLM-personalized summaries alongside templates
+  - W7 (handled in Day 34)
+  - External/public access — internal tool only
+  - Real-time file watcher (deferred to post-MVP; first version uses CLI-triggered reindex)
 
 ---
 
@@ -23,55 +23,41 @@
 
 | Layer | Service | Change |
 |-------|---------|--------|
-| Application | `src/FastAPIService/app/api/v1/notifications.py` | New — `POST /v1/notifications/summarize` SSE endpoint |
-| Application | `src/FastAPIService/app/rag/notification_chain.py` | New — prompt-template chain with tone control, prompt-version tracking |
-| Application | `src/Worker/Services/NotificationSummarizationClient.cs` | New — `INotificationSummarizationClient` in `Kendo.Shared` (first non-Gateway FastAPI caller) |
-| Application | `src/Worker/Handlers/EventCreatedHandler.cs` | Modify — call FastAPI for summarization before dispatching |
-| Application | `src/Kendo.Shared/Services/INotificationSummarizationClient.cs` | New — interface in Shared library |
-| Application | `src/Kendo.Shared/Services/NotificationSummarizationClient.cs` | New — implementation with independent Polly pipeline |
+| Application | `src/FastAPIService/app/api/v1/assistant.py` | New — `POST /v1/assistant/ask` endpoint |
+| Application | `src/FastAPIService/app/rag/assistant_index.py` | New — corpus ingestion + local vector store (Chroma or FAISS) |
+| Application | `src/FastAPIService/app/rag/assistant_chain.py` | New — citation-grounded RAG chain |
+| Application | `src/Gateway/Controllers/AssistantController.cs` | Modify — proxy to FastAPI instead of stub |
+| Application | `src/Gateway/Services/FastAPIClient.cs` | Modify — add `AssistantAskAsync` |
 
 ---
 
 ## Data Contracts
 
-Adopted by reference from `fastapi_rag_service_spec.md §W7 — Event Notification Summarization` (rev 2026-06-16).
+Adopted by reference from `fastapi_rag_service_spec.md §W6 — Document Q&A / Onboarding Assistant` (rev 2026-06-16). Key additions for this spec:
 
-**Worker → FastAPI (direct, not through Gateway):**
+**Corpus scope** (pinned per spec discussion):
+- `docs/architecture/day_*.md` — all architecture specs
+- `ops/runbooks/*.md` — all runbooks
+- `templates/skills/*.md` — agent skill templates
+- `changelog/*.md` — changelog entries
+- `.ai/orchestration.md` — orchestration rules
+- **Excluded:** `.ai/current_state.md`, `.ai/entrypoint.md`, `templates/agents/` (operational/agent-internal context)
+
+**Gateway → FastAPI:**
 ```json
-POST /v1/notifications/summarize (SSE)
+POST /v1/assistant/ask
 {
-  "event_id": "uuid",
-  "user_id": "uuid",
-  "template_id": "string",
-  "tone": "professional" | "friendly" | "urgent"
+  "query": "string"
 }
 ```
 
-**FastAPI → Worker (SSE stream):**
-```
-event: chunk
-data: {"text": "Hello ", "token_count": 1}
-
-event: chunk
-data: {"text": "Bob, ", "token_count": 2}
-
-event: done
-data: {
-  "notification_body": "Hello Bob, your event 'Birthday Party' is confirmed...",
-  "prompt_version": "w7-notification-v3",
-  "total_tokens": 128,
-  "trace_id": "string"
-}
-```
-
-**On error:**
-```
-event: error
-data: {
-  "type": "about:blank",
-  "title": "Summarization Failed",
-  "status": 503,
-  "detail": "Azure OpenAI circuit breaker open",
+**FastAPI → Gateway response:**
+```json
+{
+  "answer": "string",
+  "citations": [
+    {"source": "docs/architecture/day_22_spec.md", "line_range": "142-148", "text": "snippet"}
+  ],
   "trace_id": "string"
 }
 ```
@@ -80,73 +66,51 @@ data: {
 
 ## Implementation Plan (Commit Units)
 
-### Unit 1 — FastAPI notification summarization endpoint (SSE)
+### Unit 1 — FastAPI corpus index + citation-graded RAG chain
 
 **Files:**
-- `src/FastAPIService/app/api/v1/notifications.py` — `POST /v1/notifications/summarize` SSE endpoint
-- `src/FastAPIService/app/rag/notification_chain.py` — prompt-template chain with tone control, prompt-version header, streaming output parser
-- `tests/fastapi/test_notifications.py` — tone-control, prompt-version, streaming, error tests
+- `src/FastAPIService/app/api/v1/assistant.py` — `POST /v1/assistant/ask` route
+- `src/FastAPIService/app/rag/assistant_index.py` — corpus scanner (globs known paths), chunker (500-char overlap 50), local vector store (Chroma persisted to `/var/kendo/assistant_index/`)
+- `src/FastAPIService/app/rag/assistant_chain.py` — LangChain RAG chain with citation extraction (source + line range)
+- `tests/fastapi/test_assistant.py` — citation accuracy + faithfulness tests
+- `scripts/assistant-reindex.sh` — CLI wrapper: `./scripts/assistant-reindex.sh` rebuilds index from scratch
 
-**Gate command:** `pytest tests/fastapi/test_notifications.py` — must exit 0 with per-tenant tone control verified.
+**Gate command:** `pytest tests/fastapi/test_assistant.py` — must exit 0 with citation accuracy ≥ 95% and faithfulness ≥ 0.9.
 
 **Commit message:**
 ```
-feat(fastapi): add W7 notification summarization SSE endpoint
+feat(fastapi): add W6 internal doc Q&A — citation-grounded RAG over project corpus
 
-POST /v1/notifications/summarize streams personalized notification body via SSE
-with per-tenant tone control (professional/friendly/urgent). Prompt version stored
-on each response for audit trail. RFC 7807 on failure. Implements
-fastapi_rag_service_spec.md §W7.
+POST /v1/assistant/ask answers questions from docs/architecture/, ops/runbooks/,
+templates/skills/, changelog/, and .ai/orchestration.md. Each answer includes
+source file + line range citations. Chroma local vector store persisted to disk.
+Implements fastapi_rag_service_spec.md §W6.
 
-Day 34 — M5.13 Unit 1 of 3 | Milestone: M5.13 — W7 Event Notification Summarization
-Coverage: 100% tone-control + prompt-version tests
+Day 33 — M5.12 Unit 1 of 2 | Milestone: M5.12 — W6 Document Q&A / Onboarding Assistant
+Coverage: citation accuracy ≥ 95%, faithfulness ≥ 0.9
 Lint: clean
 ```
 
-### Unit 2 — Kendo.Shared NotificationSummarizationClient (first non-Gateway caller)
+### Unit 2 — Gateway proxy route
 
 **Files:**
-- `src/Kendo.Shared/Services/INotificationSummarizationClient.cs` — new interface
-- `src/Kendo.Shared/Services/NotificationSummarizationClient.cs` — implementation with independent Polly pipeline (30s timeout, 3 retry, 3-failure → 30s CB)
-- `src/Kendo.Shared/DI/AddKendoNotificationSummarization.cs` — DI registration extension method
-- `tests/Kendo.Tests/Shared/NotificationSummarizationClientTests.cs` — unit tests
+- `src/Gateway/Controllers/AssistantController.cs` — modify to proxy to FastAPI
+- `src/Gateway/Services/IFastAPIClient.cs` — add `AssistantAskAsync`
+- `src/Gateway/Services/FastAPIClient.cs` — implement `AssistantAskAsync`
+- `tests/Kendo.Tests/Integration/FastAPIWorkloadTests.cs` — add W6 tests
 
-**Gate command:** `dotnet test tests/Kendo.Tests --filter "Category=Notification"` — must exit 0.
+**Gate command:** `dotnet test tests/Kendo.Tests --filter "Category=FastAPIW6"` — must exit 0.
 
 **Commit message:**
 ```
-feat(shared): add NotificationSummarizationClient — first non-Gateway FastAPI caller
+feat(gateway): proxy W6 assistant/ask to FastAPI
 
-New INotificationSummarizationClient interface in Kendo.Shared with independent
-Polly pipeline (30s timeout, 3 retry, 3-failure/30s CB). Uses service-JWT minted
-via Gateway's token endpoint (Day 26/CF-2). First external caller of FastAPI that
-does NOT route through Gateway.
+Gateway AssistantController forwards POST /api/assistant/ask to FastAPI
+POST /v1/assistant/ask via IFastAPIClient.AssistantAskAsync. Returns cited
+answers to caller.
 
-Day 34 — M5.13 Unit 2 of 3 | Milestone: M5.13 — W7 Event Notification Summarization
-Coverage: 100% unit tests
-Lint: clean
-```
-
-### Unit 3 — Worker integration: call FastAPI before notification dispatch
-
-**Files:**
-- `src/Worker/Handlers/EventCreatedHandler.cs` — modify: on event creation, call `INotificationSummarizationClient` before dispatching notification
-- `src/Worker/Handlers/EventCreatedNotificationDispatch.cs` — new: extracted notification dispatch logic (if refactor needed)
-- `tests/Worker.Tests/NotificationSummarizationTests.cs` — integration test
-
-**Gate command:** `dotnet test tests/Worker.Tests --filter "Category=Notification"` — must exit 0.
-
-**Commit message:**
-```
-feat(worker): integrate W7 notification summarization into EventCreatedHandler
-
-Worker calls FastAPI via NotificationSummarizationClient before dispatching
-notification. On FastAPI failure (RFC 7807), Worker DLQs the message rather than
-retry-looping. On SSE stream error mid-generation, partial body is discarded
-and Worker falls back to template-based notification.
-
-Day 34 — M5.13 Unit 3 of 3 | Milestone: M5.13 — W7 Event Notification Summarization
-Coverage: 100% integration tests (happy + failure paths)
+Day 33 — M5.12 Unit 2 of 2 | Milestone: M5.12 — W6 Document Q&A / Onboarding Assistant
+Coverage: 100% new integration tests
 Lint: clean
 ```
 
@@ -154,31 +118,27 @@ Lint: clean
 
 ## Success Checklist
 
-Maps 1:1 to `fastapi_rag_service_spec.md §W7 acceptance gate`:
+Maps 1:1 to `fastapi_rag_service_spec.md §W6 acceptance gate`:
 
 | # | Criterion | Maps to |
 |---|-----------|---------|
-| 1 | End-to-end notification latency p95 ≤ 6s (Worker → FastAPI → SSE complete → Worker delivers) | M5.13 acceptance |
-| 2 | Per-tenant tone control respected (professional / friendly / urgent) | M5.13 acceptance |
-| 3 | Prompt version stored on the produced notification for audit | M5.13 acceptance |
-| 4 | Full RFC 7807 on failure — Worker DLQs rather than retry-loops | M5.13 acceptance |
-| 5 | NotificationSummarizationClient has independent Polly pipeline (does not share Gateway's breaker capacity) | Resilience design |
-| 6 | On SSE stream error mid-generation: Worker falls back to template, logs warning, does not DLQ | Resilience design |
+| 1 | Citation accuracy ≥ 95% (cited file + line range actually contains the answer) | M5.12 acceptance |
+| 2 | Answer faithfulness ≥ 0.9 on a held-out QA set | M5.12 acceptance |
+| 3 | Latency p95 ≤ 4s (local Chroma store — no network dependency) | M5.12 acceptance |
+| 4 | Index rebuild ≤ 1 per 5 minutes (debounced CLI; file-watcher deferred) | M5.12 acceptance |
+| 5 | `scripts/assistant-reindex.sh` exits 0 and index is queryable after rebuild | Operational safety |
 
 ---
 
 ## Resilience Mandate
 
-- **Independent Polly pipeline:** W7's `NotificationSummarizationClient` must NOT share capacity with the Gateway's `IFastAPIClient`. Each has its own circuit breaker state. This design is already established in Day 19 (Worker's `IFastAPISummarizationClient` was the precedent) — W7 follows the same pattern.
-- **Worker-side behavior:** On FastAPI RFC 7807 error → DLQ the message (not retry-loop). On SSE stream aborted mid-generation → discard partial body, fall back to templated notification, log warning, complete normally (not DLQ).
-- **No direct Gateway dependency:** Worker calls FastAPI directly on the internal network. No Gateway hop = no shared circuit breaker contention.
+- Local vector store (Chroma) has no external network dependency — no circuit breaker needed
+- Index rebuild is single-threaded and atomic: build new index in temp dir, swap atomically on success
+- If index is missing or corrupt: FastAPI returns RFC 7807 503 with `title: "Assistant index unavailable"` and `detail: "Run scripts/assistant-reindex.sh"`
 
 ---
 
 ## Depends on
 
-- `docs/architecture/fastapi_rag_service_spec.md §W7` — data contracts, acceptance gates
-- `docs/architecture/day_19_spec.md` — Worker AI handlers precedent (IFastAPISummarizationClient pattern)
-- Day 26 (CF-2) — service-JWT issuance available for Worker → FastAPI calls
-- `src/Kendo.Shared/` — new interface + implementation
-- `src/Worker/Handlers/EventCreatedHandler.cs` — existing handler, modified
+- `docs/architecture/fastapi_rag_service_spec.md §W6` — data contracts, acceptance gates
+- M5.1 (Day 21) — FastAPI scaffold

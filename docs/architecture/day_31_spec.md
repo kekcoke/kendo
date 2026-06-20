@@ -1,20 +1,21 @@
-# Architecture Spec — Day 31 — W3: User Profile Semantic Search
+# Architecture Spec — Day 30 — W5: Embeddings Backfill & Re-indexing
 
-> **Milestone:** M5.9 — W3 User Profile Semantic Search (P1)  
+> **Milestone:** M5.11 — W5 Embeddings Backfill & Re-indexing (P1, first P1 workload)  
 > **Roadmap phase:** 05 — AI/Vector Service (FastAPI)  
 > **Date:** 2026-06-20  
-> **Type:** Workload spec (adopts by reference `fastapi_rag_service_spec.md §W3`)  
-> **Depends on:** `docs/architecture/fastapi_rag_service_spec.md` §W3 (design-spec contract, rev 2026-06-16), Day 30 (M5.11 — W5 sets up user_embeddings)
+> **Type:** Workload spec (adopts by reference `fastapi_rag_service_spec.md §W5`)  
+> **Depends on:** `docs/architecture/fastapi_rag_service_spec.md` §W5 (design-spec contract, rev 2026-06-16)
 
 ---
 
 ## Milestone Scope
 
-- **What:** Implement W3 — `GET /api/users/search?q=...` on the Gateway proxies to FastAPI `/v1/users/search` which runs hybrid search (pgvector cosine + Postgres BM25 full-text) against the `user_embeddings` table seeded by W5.
-- **Maps to:** `fastapi_rag_service_spec.md §W3 — User Profile Semantic Search` (data contracts, acceptance gates)
+- **What:** Implement W5 — a batch embeddings backfill and re-indexing job for FastAPI. `apscheduler` cron job + `python -m app.jobs.reindex` CLI. Reads rows from UserService via internal API (no direct DB write — defense-in-depth via `fastapi_ro`). Writes via UserService admin endpoint.
+- **Why P1 first:** Sets up the embedding infrastructure that W3 (semantic search) reads.
+- **Maps to:** `fastapi_rag_service_spec.md §W5 — Embeddings Backfill & Re-indexing` (data contracts, acceptance gates)
 - **Explicitly out of scope:**
-  - Embedding column migration — W5 already created `user_embeddings`
-  - W5 backfill job — already live
+  - Admin endpoint auth between FastAPI and UserService — uses existing `admin:writes` JWT scope per CCD-3
+  - W3 semantic search (handled in Day 31)
 
 ---
 
@@ -22,82 +23,77 @@
 
 | Layer | Service | Change |
 |-------|---------|--------|
-| Application | `src/FastAPIService/app/api/v1/user_search.py` | New — `GET /v1/users/search` endpoint |
-| Application | `src/FastAPIService/app/repositories/user_search.py` | New — hybrid search (pgvector cosine + Postgres full-text BM25 via `ts_rank`) |
-| Application | `src/Gateway/Controllers/UserSearchController.cs` | Modify — proxy to FastAPI instead of stub |
-| Application | `src/Gateway/Services/FastAPIClient.cs` | Modify — add `UserSearchAsync` method |
+| Application | `src/FastAPIService/app/jobs/reindex.py` | New — CLI entry point (`python -m app.jobs.reindex`) |
+| Application | `src/FastAPIService/app/jobs/scheduler.py` | New — `apscheduler` cron job for periodic reindex |
+| Application | `src/FastAPIService/app/integrations/user_service_client.py` | New — HTTP client to UserService admin endpoint |
+| Application | `src/UserService/Controllers/EmbeddingAdminController.cs` | Modify — ensure batch-accept path exists (returns 202 with job ID) |
 
 ---
 
 ## Data Contracts
 
-Adopted by reference from `fastapi_rag_service_spec.md §W3 — User Profile Semantic Search` (rev 2026-06-16).
+Adopted by reference from `fastapi_rag_service_spec.md §W5 — Embeddings Backfill & Re-indexing` (rev 2026-06-16).
 
-**Gateway → FastAPI:**
-```
-GET /v1/users/search?q=string&top_k=10
-```
+**New FastAPI ↔ UserService integration contract (extending CCD-3):**
 
-**FastAPI → Gateway response:**
-```json
-{
-  "results": [
-    {"user_id": "uuid", "score": 0.92, "matched_field": "bio"}
-  ],
-  "trace_id": "string"
-}
-```
+- FastAPI reads events from UserService via `GET /api/events?since=<timestamp>&limit=64`
+- FastAPI computes embeddings in batches of 64
+- FastAPI writes embeddings back via `POST /internal/embeddings/batch` on UserService's `EmbeddingAdminController`
+- Both endpoints require service-JWT with `admin:writes` scope
 
-Gateway resolves user IDs → full profiles via UserService and returns the complete list.
+**Checkpoint/resume contract:**
+- Job state file at `/var/kendo/reindex_checkpoint.json` — contains `last_processed_event_id` and `last_processed_at`
+- Resumable: on restart, reads checkpoint and resumes from that position
+- Idempotent: UserService's admin endpoint uses `event_id + model_version` as upsert key
 
 ---
 
 ## Implementation Plan (Commit Units)
 
-### Unit 1 — FastAPI hybrid search endpoint
+### Unit 1 — FastAPI reindex CLI + UserService batch admin endpoint
 
 **Files:**
-- `src/FastAPIService/app/api/v1/user_search.py` — `GET /v1/users/search` route
-- `src/FastAPIService/app/repositories/user_search.py` — hybrid retriever combining `embedding <=> $1` cosine + `ts_rank(tsvector, plainto_tsquery(...))`
-- `src/FastAPIService/app/rag/ensemble_retriever.py` — `EnsembleRetriever` weighting (cosine 0.7, BM25 0.3), configurable via env var
-- `tests/fastapi/test_user_search.py` — integration tests
+- `src/FastAPIService/app/jobs/reindex.py` — CLI entry point with argparse (`--since`, `--batch-size`, `--dry-run`)
+- `src/FastAPIService/app/integrations/user_service_client.py` — HTTP client for UserService reads + writes
+- `src/UserService/Controllers/EmbeddingAdminController.cs` — add `POST /internal/embeddings/batch` (returns 202 with job ID)
+- `tests/fastapi/test_reindex.py` — unit tests for CLI + client
+- `tests/Kendo.Tests/Integration/EmbeddingAdminTests.cs` — integration test for batch endpoint
 
-**Gate command:** `pytest tests/fastapi/test_user_search.py` — must exit 0 with precision@10 ≥ 0.85 on labeled query set.
+**Gate command:** `python -m app.jobs.reindex --since 2026-01-01 --batch-size 64 --dry-run` + `dotnet test tests/Kendo.Tests --filter "Category=EmbeddingAdmin"`
 
 **Commit message:**
 ```
-feat(fastapi): add W3 user semantic search — hybrid pgvector cosine + BM25
+feat(fastapi+userservice): add W5 embeddings backfill CLI and batch admin endpoint
 
-GET /v1/users/search runs EnsembleRetriever with configurable weight split
-(default 0.7 cosine, 0.3 BM25). Returns top-N user IDs with relevance scores.
-Gateway resolves IDs to full profiles via UserService.
-Implements fastapi_rag_service_spec.md §W3.
+Adds python -m app.jobs.reindex CLI with checkpoint/resume and idempotent batch
+writes. UserService EmbeddingAdminController gains POST /internal/embeddings/batch
+(202 + job ID). 64-event batch size, upsert by event_id+model_version.
+Implements fastapi_rag_service_spec.md §W5.
 
-Day 31 — M5.9 Unit 1 of 2 | Milestone: M5.9 — W3 User Profile Semantic Search
-Coverage: precision@10 ≥ 0.85
+Day 30 — M5.11 Unit 1 of 2 | Milestone: M5.11 — W5 Embeddings Backfill & Re-indexing
+Coverage: 100% CLI + batch endpoint tests
 Lint: clean
 ```
 
-### Unit 2 — Gateway route
+### Unit 2 — apscheduler cron + checkpoint persistence
 
 **Files:**
-- `src/Gateway/Controllers/UserSearchController.cs` — modify existing controller to proxy to FastAPI
-- `src/Gateway/Services/IFastAPIClient.cs` — add `UserSearchAsync`
-- `src/Gateway/Services/FastAPIClient.cs` — implement `UserSearchAsync`
-- `tests/Kendo.Tests/Integration/FastAPIWorkloadTests.cs` — add W3 tests
+- `src/FastAPIService/app/jobs/scheduler.py` — apscheduler cron job, configurable interval (default daily at 02:00 UTC)
+- `src/FastAPIService/app/jobs/checkpoint.py` — checkpoint read/write with file lock
+- `tests/fastapi/test_scheduler.py` — cron job unit tests
 
-**Gate command:** `dotnet test tests/Kendo.Tests --filter "Category=FastAPIW3"` — must exit 0.
+**Gate command:** `pytest tests/fastapi/test_scheduler.py`
 
 **Commit message:**
 ```
-feat(gateway): proxy W3 user search to FastAPI with existing Polly pipeline
+feat(fastapi): add apscheduler cron for periodic embeddings reindex
 
-Gateway UserSearchController forwards GET /api/users/search to FastAPI
-GET /v1/users/search via IFastAPIClient.UserSearchAsync. Result IDs resolved to
-full profiles via UserService before returning to client.
+Daily 02:00 UTC reindex job with checkpoint/resume. File-lock protected
+checkpoint at /var/kendo/reindex_checkpoint.json. Configurable interval
+via FASTAPI__REINDEX__SCHEDULE env var.
 
-Day 31 — M5.9 Unit 2 of 2 | Milestone: M5.9 — W3 User Profile Semantic Search
-Coverage: 100% new integration tests
+Day 30 — M5.11 Unit 2 of 2 | Milestone: M5.11 — W5 Embeddings Backfill & Re-indexing
+Coverage: 100% scheduler tests
 Lint: clean
 ```
 
@@ -105,27 +101,30 @@ Lint: clean
 
 ## Success Checklist
 
-Maps 1:1 to `fastapi_rag_service_spec.md §W3 acceptance gate`:
+Maps 1:1 to `fastapi_rag_service_spec.md §W5 acceptance gate`:
 
 | # | Criterion | Maps to |
 |---|-----------|---------|
-| 1 | precision@10 ≥ 0.85 on the labeled query set | M5.9 acceptance |
-| 2 | Hybrid search latency p95 ≤ 300ms | M5.9 acceptance |
-| 3 | Ensemble weight split configurable via env var (FastAPI restart) | Operational flexibility |
-| 4 | Gateway resolves user IDs to full profiles before returning | UX completeness |
+| 1 | 10k events re-embedded in ≤ 5 minutes on a 2-core container | M5.11 acceptance |
+| 2 | Idempotent: re-running produces no duplicate embeddings | M5.11 acceptance |
+| 3 | Resumable: process death mid-run resumes from last checkpoint, not from zero | M5.11 acceptance |
+| 4 | Writes go through UserService admin endpoint, not direct DB (fastapi_ro enforced) | Defense-in-depth |
+| 5 | Checkpoint file is lock-protected against concurrent job runs | Operational safety |
 
 ---
 
 ## Resilience Mandate
 
-- Same pybreaker + tenacity pattern as foundation. No new resilience config.
-- Gateway `UserSearchAsync` uses existing `IFastAPIClient` Polly pipeline.
-- Hybrid search failure falls back to pure BM25 (cosine fails → return BM25 results; BM25 fails → return empty array, not 500).
+- Retry on each 64-event batch: up to 3 retries with exponential backoff (tenacity)
+- Circuit breaker on UserService admin endpoint (wrapped in pybreaker, inherited pattern)
+- Job timeout: max 30 minutes runtime; if exceeded, job logs warning and exits. Next cron run resumes from checkpoint
+- File-lock on checkpoint prevents concurrent job runs
 
 ---
 
 ## Depends on
 
-- `docs/architecture/fastapi_rag_service_spec.md §W3` — data contracts, acceptance gates
-- Day 30 (M5.11) — `user_embeddings` table populated by W5 backfill
-- `src/FastAPIService/app/db.py` — existing asyncpg pool (extend with full-text query)
+- `docs/architecture/fastapi_rag_service_spec.md §W5` — data contracts, acceptance gates
+- M5.2+M5.3 (Day 22) — pgvector read access + embedding model available
+- Day 20 (M0.6) — `EmbeddingAdminController` exists with `admin:writes` scope
+- Day 26 (CF-2) — service-JWT issuance available for FastAPI → UserService calls

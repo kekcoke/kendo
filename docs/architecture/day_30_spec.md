@@ -1,21 +1,21 @@
-# Architecture Spec — Day 30 — W5: Embeddings Backfill & Re-indexing
+# Architecture Spec — Day 29 — W8: Evaluation & Regression Gate
 
-> **Milestone:** M5.11 — W5 Embeddings Backfill & Re-indexing (P1, first P1 workload)  
+> **Milestone:** M5.14 — W8 Evaluation & Regression Gate (P0)  
 > **Roadmap phase:** 05 — AI/Vector Service (FastAPI)  
 > **Date:** 2026-06-20  
-> **Type:** Workload spec (adopts by reference `fastapi_rag_service_spec.md §W5`)  
-> **Depends on:** `docs/architecture/fastapi_rag_service_spec.md` §W5 (design-spec contract, rev 2026-06-16)
+> **Type:** Infrastructure spec (Case C — no pre-authored spec; adopts `fastapi_rag_service_spec.md §W8` by reference)  
+> **Depends on:** M5.1–M5.6 foundation (all live on `develop`), no workload datasets required (starts empty)
 
 ---
 
 ## Milestone Scope
 
-- **What:** Implement W5 — a batch embeddings backfill and re-indexing job for FastAPI. `apscheduler` cron job + `python -m app.jobs.reindex` CLI. Reads rows from UserService via internal API (no direct DB write — defense-in-depth via `fastapi_ro`). Writes via UserService admin endpoint.
-- **Why P1 first:** Sets up the embedding infrastructure that W3 (semantic search) reads.
-- **Maps to:** `fastapi_rag_service_spec.md §W5 — Embeddings Backfill & Re-indexing` (data contracts, acceptance gates)
+- **What:** Implement the W8 Evaluation & Regression Gate — a `pytest` suite using **DeepEval** (faithfulness, answer relevancy, hallucination) and **Ragas** (context precision/recall) that runs in CI on every PR touching `src/FastAPIService/`. Starts with an **empty dataset** (a 0% baseline). Build fails on any metric regression > 5% vs. the `main` baseline.
+- **Maps to:** `fastapi_rag_service_spec.md §W8 — Evaluation & Regression Gate for LLM Outputs` (data contracts, acceptance gates)
 - **Explicitly out of scope:**
-  - Admin endpoint auth between FastAPI and UserService — uses existing `admin:writes` JWT scope per CCD-3
-  - W3 semantic search (handled in Day 31)
+  - Individual workload eval datasets (W1 dataset wired on Day 30 during W1 merge)
+  - Nightly `develop` runs (added after first dataset lands)
+  - W2–W7 workload implementation (handled in subsequent days)
 
 ---
 
@@ -23,108 +23,122 @@
 
 | Layer | Service | Change |
 |-------|---------|--------|
-| Application | `src/FastAPIService/app/jobs/reindex.py` | New — CLI entry point (`python -m app.jobs.reindex`) |
-| Application | `src/FastAPIService/app/jobs/scheduler.py` | New — `apscheduler` cron job for periodic reindex |
-| Application | `src/FastAPIService/app/integrations/user_service_client.py` | New — HTTP client to UserService admin endpoint |
-| Application | `src/UserService/Controllers/EmbeddingAdminController.cs` | Modify — ensure batch-accept path exists (returns 202 with job ID) |
-
----
-
-## Data Contracts
-
-Adopted by reference from `fastapi_rag_service_spec.md §W5 — Embeddings Backfill & Re-indexing` (rev 2026-06-16).
-
-**New FastAPI ↔ UserService integration contract (extending CCD-3):**
-
-- FastAPI reads events from UserService via `GET /api/events?since=<timestamp>&limit=64`
-- FastAPI computes embeddings in batches of 64
-- FastAPI writes embeddings back via `POST /internal/embeddings/batch` on UserService's `EmbeddingAdminController`
-- Both endpoints require service-JWT with `admin:writes` scope
-
-**Checkpoint/resume contract:**
-- Job state file at `/var/kendo/reindex_checkpoint.json` — contains `last_processed_event_id` and `last_processed_at`
-- Resumable: on restart, reads checkpoint and resumes from that position
-- Idempotent: UserService's admin endpoint uses `event_id + model_version` as upsert key
+| Test | `tests/fastapi/eval/` | New — eval test directory |
+| Test | `tests/fastapi/eval/conftest.py` | New — eval fixtures, metric configuration |
+| Test | `tests/fastapi/eval/datasets/` | New — golden dataset directory (starts empty, `.gitkeep`) |
+| Test | `tests/fastapi/eval/baseline/` | New — baseline metric snapshots (starts empty) |
+| Test | `tests/fastapi/eval/test_regression.py` | New — regression test suite with DeepEval + Ragas metrics |
+| App | `pyproject.toml` | Modify — add `deepeval`, `ragas` dependencies |
+| CI | `.github/workflows/ci.yml` | Modify — add `eval-gate` job |
+| Ops | `ops/runbooks/day_29_runbook.md` | New — W8 eval gate runbook |
 
 ---
 
 ## Implementation Plan (Commit Units)
 
-### Unit 1 — FastAPI reindex CLI + UserService batch admin endpoint
+### Unit 1 — Eval framework scaffold + empty dataset
 
 **Files:**
-- `src/FastAPIService/app/jobs/reindex.py` — CLI entry point with argparse (`--since`, `--batch-size`, `--dry-run`)
-- `src/FastAPIService/app/integrations/user_service_client.py` — HTTP client for UserService reads + writes
-- `src/UserService/Controllers/EmbeddingAdminController.cs` — add `POST /internal/embeddings/batch` (returns 202 with job ID)
-- `tests/fastapi/test_reindex.py` — unit tests for CLI + client
-- `tests/Kendo.Tests/Integration/EmbeddingAdminTests.cs` — integration test for batch endpoint
+- `src/FastAPIService/tests/fastapi/eval/__init__.py` — empty
+- `src/FastAPIService/tests/fastapi/eval/conftest.py` — eval settings, DeepEval/Ragas metric factory fixtures, dataset loader stub
+- `src/FastAPIService/tests/fastapi/eval/datasets/.gitkeep` — empty dataset dir
+- `src/FastAPIService/tests/fastapi/eval/baseline/.gitkeep` — empty baseline dir
+- `src/FastAPIService/tests/fastapi/eval/test_regression.py` — regression test skeleton with metric placeholders, parametrized over datasets
+- `src/FastAPIService/pyproject.toml` — add `deepeval`, `ragas`
 
-**Gate command:** `python -m app.jobs.reindex --since 2026-01-01 --batch-size 64 --dry-run` + `dotnet test tests/Kendo.Tests --filter "Category=EmbeddingAdmin"`
+**Gate command:** `pytest tests/fastapi/eval/ -v` — must exit 0 (empty dataset, all metrics report "no data" gracefully).
 
 **Commit message:**
 ```
-feat(fastapi+userservice): add W5 embeddings backfill CLI and batch admin endpoint
+feat(eval): add W8 eval gate scaffold — DeepEval + Ragas, empty dataset
 
-Adds python -m app.jobs.reindex CLI with checkpoint/resume and idempotent batch
-writes. UserService EmbeddingAdminController gains POST /internal/embeddings/batch
-(202 + job ID). 64-event batch size, upsert by event_id+model_version.
-Implements fastapi_rag_service_spec.md §W5.
+Creates tests/fastapi/eval/ with:
+- conftest.py: eval settings, metric factory (faithfulness, answer_relevancy,
+  context_precision, context_recall)
+- test_regression.py: regression test suite with parametrized dataset loading
+- datasets/: golden dataset directory (empty, .gitkeep)
+- baseline/: baseline metric snapshots (empty, .gitkeep)
+- pyproject.toml: add deepeval>=1.0.0, ragas>=0.2.0
 
-Day 30 — M5.11 Unit 1 of 2 | Milestone: M5.11 — W5 Embeddings Backfill & Re-indexing
-Coverage: 100% CLI + batch endpoint tests
+Empty dataset = 0% baseline. Datasets added by each workload on merge.
+Gate command: pytest tests/fastapi/eval/ -v
+
+Day 29 — M5.14 Unit 1 of 3 | Milestone: M5.14 — W8 Evaluation & Regression Gate
 Lint: clean
 ```
 
-### Unit 2 — apscheduler cron + checkpoint persistence
+### Unit 2 — CI eval-gate job
 
 **Files:**
-- `src/FastAPIService/app/jobs/scheduler.py` — apscheduler cron job, configurable interval (default daily at 02:00 UTC)
-- `src/FastAPIService/app/jobs/checkpoint.py` — checkpoint read/write with file lock
-- `tests/fastapi/test_scheduler.py` — cron job unit tests
+- `.github/workflows/ci.yml` — add `eval-gate` job:
+  - Trigger: `paths: ['src/FastAPIService/**', 'tests/fastapi/eval/**']`
+  - Steps: setup Python, install deps, `pytest tests/fastapi/eval/ --junitxml=eval-report.xml`
+  - Upload artifact: `eval-report.xml`
+  - Fails build on > 5% regression vs baseline (DeepEval metric thresholds in test config)
 
-**Gate command:** `pytest tests/fastapi/test_scheduler.py`
+**Gate command:** `cat .github/workflows/ci.yml | grep -A30 "eval-gate"` — CI job definition present.
 
 **Commit message:**
 ```
-feat(fastapi): add apscheduler cron for periodic embeddings reindex
+ci(eval): add eval-gate CI job — regression gate for FastAPI changes
 
-Daily 02:00 UTC reindex job with checkpoint/resume. File-lock protected
-checkpoint at /var/kendo/reindex_checkpoint.json. Configurable interval
-via FASTAPI__REINDEX__SCHEDULE env var.
+New eval-gate job runs pytest tests/fastapi/eval/ on every PR touching
+src/FastAPIService/. Fails build on >5% metric regression. Results uploaded
+as CI artifact.
 
-Day 30 — M5.11 Unit 2 of 2 | Milestone: M5.11 — W5 Embeddings Backfill & Re-indexing
-Coverage: 100% scheduler tests
-Lint: clean
+Day 29 — M5.14 Unit 2 of 3 | Milestone: M5.14 — W8 Evaluation & Regression Gate
+```
+
+### Unit 3 — Baseline management + runbook
+
+**Files:**
+- `src/FastAPIService/tests/fastapi/eval/regenerate_baseline.py` — script to re-run eval suite and store metric snapshots as baseline
+- `ops/runbooks/day_29_runbook.md` — deployment, verification, adding datasets, regenerating baselines
+- `docs/architecture/day_29_review_report.md` — Phase 4b review artifact
+
+**Gate command:** `python -m pytest tests/fastapi/eval/ -v --co` — quick-check passes, runbook readable.
+
+**Commit message:**
+```
+chore(eval): add baseline management script + W8 runbook
+
+- regenerate_baseline.py: re-runs eval suite, persists metric snapshots
+- ops/runbooks/day_29_runbook.md: deployment, CI gate verification,
+  adding workload datasets, baseline regeneration
+- day_29_review_report.md: Phase 4b gate check
+
+Day 29 — M5.14 Unit 3 of 3 | Milestone: M5.14 — W8 Evaluation & Regression Gate
 ```
 
 ---
 
 ## Success Checklist
 
-Maps 1:1 to `fastapi_rag_service_spec.md §W5 acceptance gate`:
+Maps 1:1 to `fastapi_rag_service_spec.md §W8 acceptance gate`:
 
-| # | Criterion | Maps to |
-|---|-----------|---------|
-| 1 | 10k events re-embedded in ≤ 5 minutes on a 2-core container | M5.11 acceptance |
-| 2 | Idempotent: re-running produces no duplicate embeddings | M5.11 acceptance |
-| 3 | Resumable: process death mid-run resumes from last checkpoint, not from zero | M5.11 acceptance |
-| 4 | Writes go through UserService admin endpoint, not direct DB (fastapi_ro enforced) | Defense-in-depth |
-| 5 | Checkpoint file is lock-protected against concurrent job runs | Operational safety |
+| # | Criterion | How Verified |
+|---|-----------|-------------|
+| 1 | `pytest tests/fastapi/eval/` runs in CI on every PR touching `src/FastAPIService/` | CI job exists, trigger paths correct |
+| 2 | Build fails on any metric regression > 5% vs. `main` baseline | DeepEval metric thresholds in test assertions |
+| 3 | Eval dataset is versioned in git (regressions reproducible) | `tests/fastapi/eval/datasets/` git-tracked |
+| 4 | Suite completes in ≤ 10 minutes in CI | Empty dataset = < 1m; realistic limit with `pytest --co` quick-check |
+| 5 | Results uploaded as CI artifact | `actions/upload-artifact` on `eval-report.xml` |
+| 6 | Baseline snapshots storable and regenerable | `regenerate_baseline.py` script provided |
 
 ---
 
 ## Resilience Mandate
 
-- Retry on each 64-event batch: up to 3 retries with exponential backoff (tenacity)
-- Circuit breaker on UserService admin endpoint (wrapped in pybreaker, inherited pattern)
-- Job timeout: max 30 minutes runtime; if exceeded, job logs warning and exits. Next cron run resumes from checkpoint
-- File-lock on checkpoint prevents concurrent job runs
+The eval gate itself has no direct resilience requirements (it's a CI-only tool). However:
+
+- **Graceful degradation:** Empty dataset = all metrics report "no data" without erroring
+- **Independent from production:** Eval suite runs standalone, no FastAPI app instance required
+- **Fail-safe:** DeepEval `assert_test()` raises `AssertionError` on metric failure, which pytest converts to a test failure → CI build failure
 
 ---
 
 ## Depends on
 
-- `docs/architecture/fastapi_rag_service_spec.md §W5` — data contracts, acceptance gates
-- M5.2+M5.3 (Day 22) — pgvector read access + embedding model available
-- Day 20 (M0.6) — `EmbeddingAdminController` exists with `admin:writes` scope
-- Day 26 (CF-2) — service-JWT issuance available for FastAPI → UserService calls
+- `docs/architecture/fastapi_rag_service_spec.md §W8` — design-spec contract
+- M5.1–M5.6 foundation (FastAPI scaffold, pgvector, LangChain, resilience) — all live on `develop`
+- No workload datasets required — starts empty per spec
