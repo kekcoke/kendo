@@ -33,6 +33,14 @@ fi
 echo "[STEP] Unpausing PostgreSQL..."
 docker compose unpause postgres
 
+# Wait for PostgreSQL to fully resume before checking service recovery
+# This eliminates the race condition where curl fires before PG connection pool reopens
+RETRIES=15
+until docker compose exec -T postgres pg_isready -q 2>/dev/null || [ $RETRIES -eq 0 ]; do
+  sleep 1
+  RETRIES=$((RETRIES - 1))
+done
+
 echo "[STEP] Waiting for recovery..."
 for i in $(seq 1 15); do
   READY=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5001/health/ready 2>/dev/null || echo "000")
