@@ -1,0 +1,122 @@
+[
+  {
+    "input": "Birthday party with 15 guests, no nuts please at 7pm Saturday",
+    "actual_output": "{\"name\": \"Birthday Party\", \"headcount\": 15, \"time\": \"7pm Saturday\", \"dietary_notes\": \"no nuts\", \"location\": null, \"event_id\": \"mock-event-id-1\"}",
+    "expected_output": "{\"name\": \"Birthday Party\", \"headcount\": 15, \"time\": \"7pm Saturday\", \"dietary_notes\": \"no nuts\", \"location\": null, \"event_id\": \"mock-event-id-1\"}",
+    "retrieval_context": ["Past event: Company picnic for 20 people in the park"]
+  },
+  {
+    "input": "Team standup at 9am tomorrow in Conference Room A",
+    "actual_output": "{\"name\": \"Team Standup\", \"headcount\": 8, \"time\": \"9am tomorrow\", \"dietary_notes\": null, \"location\": \"Conference Room A\", \"event_id\": \"mock-event-id-2\"}",
+    "expected_output": "{\"name\": \"Team Standup\", \"headcount\": 8, \"time\": \"9am tomorrow\", \"dietary_notes\": null, \"location\": \"Conference Room A\", \"event_id\": \"mock-event-id-2\"}",
+    "retrieval_context": ["Past event: Daily scrum in Conference Room B"]
+  },
+  {
+    "input": "Wedding reception at Grand Ballroom, 200 guests, vegetarian menu preferred",
+    "actual_output": "{\"name\": \"Wedding Reception\", \"headcount\": 200, \"time\": null, \"dietary_notes\": \"vegetarian menu preferred\", \"location\": \"Grand Ballroom\", \"event_id\": \"mock-event-id-3\"}",
+    "expected_output": "{\"name\": \"Wedding Reception\", \"headcount\": 200, \"time\": null, \"dietary_notes\": \"vegetarian menu preferred\", \"location\": \"Grand Ballroom\", \"event_id\": \"mock-event-id-3\"}",
+    "retrieval_context": ["Past event: Corporate gala for 150 at Grand Ballroom"]
+  },
+  {
+    "input": "Quick coffee catchup",
+    "actual_output": "{\"name\": \"Quick Coffee Catchup\", \"headcount\": 2, \"time\": null, \"dietary_notes\": null, \"location\": null, \"event_id\": \"mock-event-id-4\"}",
+    "expected_output": "{\"name\": \"Quick Coffee Catchup\", \"headcount\": 2, \"time\": null, \"dietary_notes\": null, \"location\": null, \"event_id\": \"mock-event-id-4\"}",
+    "retrieval_context": ["Past event: Coffee chat with Sarah at Starbucks"]
+  },
+  {
+    "input": "Hi",
+    "actual_output": "{\"name\": \"Untitled Event\", \"headcount\": 1, \"time\": null, \"dietary_notes\": null, \"location\": null, \"event_id\": \"mock-event-id-5\"}",
+    "expected_output": "{\"name\": \"Untitled Event\", \"headcount\": 1, \"time\": null, \"dietary_notes\": null, \"location\": null, \"event_id\": \"mock-event-id-5\"}",
+    "retrieval_context": []
+  },
+  {
+    "input": "Annual board meeting on March 15 2026 at 3pm with 12 board members, formal dinner to follow",
+    "actual_output": "{\"name\": \"Annual Board Meeting\", \"headcount\": 12, \"time\": \"March 15 2026 at 3pm\", \"dietary_notes\": \"formal dinner to follow\", \"location\": null, \"event_id\": \"mock-event-id-6\"}",
+    "expected_output": "{\"name\": \"Annual Board Meeting\", \"headcount\": 12, \"time\": \"March 15 2026 at 3pm\", \"dietary_notes\": \"formal dinner to follow\", \"location\": null, \"event_id\": \"mock-event-id-6\"}",
+    "retrieval_context": ["Past event: Q4 board review with 10 members", "Past event: Executive dinner at Oak Room"]
+  },
+  {
+    "input": "Workshop: Introduction to GraphQL, 25 attendees, bring laptops",
+    "actual_output": "{\"name\": \"Workshop: Introduction to GraphQL\", \"headcount\": 25, \"time\": null, \"dietary_notes\": null, \"location\": null, \"event_id\": \"mock-event-id-7\"}",
+    "expected_output": "{\"name\": \"Workshop: Introduction to GraphQL\", \"headcount\": 25, \"time\": null, \"dietary_notes\": null, \"location\": null, \"event_id\": \"mock-event-id-7\"}",
+    "retrieval_context": ["Past event: Python workshop for 30 people in Lab A"]
+  },
+  {
+    "input": "Dinner at Luigi's Italian Restaurant, 8pm Friday, party of 6, gluten free options needed",
+    "actual_output": "{\"name\": \"Dinner at Luigi's Italian Restaurant\", \"headcount\": 6, \"time\": \"8pm Friday\", \"dietary_notes\": \"gluten free options needed\", \"location\": \"Luigi's Italian Restaurant\", \"event_id\": \"mock-event-id-8\"}",
+    "expected_output": "{\"name\": \"Dinner at Luigi's Italian Restaurant\", \"headcount\": 6, \"time\": \"8pm Friday\", \"dietary_notes\": \"gluten free options needed\", \"location\": \"Luigi's Italian Restaurant\", \"event_id\": \"mock-event-id-8\"}",
+    "retrieval_context": ["Past event: Team dinner at Luigi's for 8 people"]
+  },
+  {
+    "input": "Yoga class every Tuesday and Thursday at 7am in the rooftop studio",
+    "actual_output": "{\"name\": \"Yoga Class\", \"headcount\": 15, \"time\": \"every Tuesday and Thursday at 7am\", \"dietary_notes\": null, \"location\": \"rooftop studio\", \"event_id\": \"mock-event-id-9\"}",
+    "expected_output": "{\"name\": \"Yoga Class\", \"headcount\": 15, \"time\": \"every Tuesday and Thursday at 7am\", \"dietary_notes\": null, \"location\": \"rooftop studio\", \"event_id\": \"mock-event-id-9\"}",
+    "retrieval_context": ["Past event: Morning yoga session with 12 attendees"]
+  },
+  {
+    "input": "Project kickoff for the mobile app redesign, 20 people, pizza lunch provided, please RSVP by Friday",
+    "actual_output": "{\"name\": \"Project Kickoff for the Mobile App Redesign\", \"headcount\": 20, \"time\": null, \"dietary_notes\": \"pizza lunch provided\", \"location\": null, \"event_id\": \"mock-event-id-10\"}",
+    "expected_output": "{\"name\": \"Project Kickoff for the Mobile App Redesign\", \"headcount\": 20, \"time\": null, \"dietary_notes\": \"pizza lunch provided\", \"location\": null, \"event_id\": \"mock-event-id-10\"}",
+    "retrieval_context": ["Past event: Mobile app sprint planning for 15"]
+  },
+  {
+    "input": "Client pitch meeting with Acme Corp, executive team only, 5 people, confidential",
+    "actual_output": "{\"name\": \"Client Pitch Meeting with Acme Corp\", \"headcount\": 5, \"time\": null, \"dietary_notes\": null, \"location\": null, \"event_id\": \"mock-event-id-11\"}",
+    "expected_output": "{\"name\": \"Client Pitch Meeting with Acme Corp\", \"headcount\": 5, \"time\": null, \"dietary_notes\": null, \"location\": null, \"event_id\": \"mock-event-id-11\"}",
+    "retrieval_context": ["Past event: Acme Corp quarterly review in Board Room"]
+  },
+  {
+    "input": "Summer BBQ potluck in the courtyard, bring your own drinks, 50 colleagues expected, halal options requested",
+    "actual_output": "{\"name\": \"Summer BBQ Potluck\", \"headcount\": 50, \"time\": null, \"dietary_notes\": \"halal options requested\", \"location\": \"courtyard\", \"event_id\": \"mock-event-id-12\"}",
+    "expected_output": "{\"name\": \"Summer BBQ Potluck\", \"headcount\": 50, \"time\": null, \"dietary_notes\": \"halal options requested\", \"location\": \"courtyard\", \"event_id\": \"mock-event-id-12\"}",
+    "retrieval_context": ["Past event: Company BBQ for 60 in the garden"]
+  },
+  {
+    "input": "",
+    "actual_output": "{\"name\": \"Untitled Event\", \"headcount\": 1, \"time\": null, \"dietary_notes\": null, \"location\": null, \"event_id\": \"mock-event-id-13\"}",
+    "expected_output": "{\"name\": \"Untitled Event\", \"headcount\": 1, \"time\": null, \"dietary_notes\": null, \"location\": null, \"event_id\": \"mock-event-id-13\"}",
+    "retrieval_context": []
+  },
+  {
+    "input": "Hackathon weekend: 48 hours of coding, 100 participants, meals provided, vegan and non-vegan options",
+    "actual_output": "{\"name\": \"Hackathon Weekend\", \"headcount\": 100, \"time\": null, \"dietary_notes\": \"vegan and non-vegan options\", \"location\": null, \"event_id\": \"mock-event-id-14\"}",
+    "expected_output": "{\"name\": \"Hackathon Weekend\", \"headcount\": 100, \"time\": null, \"dietary_notes\": \"vegan and non-vegan options\", \"location\": null, \"event_id\": \"mock-event-id-14\"}",
+    "retrieval_context": ["Past event: Internal hackathon with 80 engineers"]
+  },
+  {
+    "input": "One-on-one with manager, 30 minutes, bring progress report",
+    "actual_output": "{\"name\": \"One-on-One with Manager\", \"headcount\": 2, \"time\": \"30 minutes\", \"dietary_notes\": null, \"location\": null, \"event_id\": \"mock-event-id-15\"}",
+    "expected_output": "{\"name\": \"One-on-One with Manager\", \"headcount\": 2, \"time\": \"30 minutes\", \"dietary_notes\": null, \"location\": null, \"event_id\": \"mock-event-id-15\"}",
+    "retrieval_context": ["Past event: Weekly 1:1 with manager in their office"]
+  },
+  {
+    "input": "New year eve gala at Skyline Rooftop, 300 guests, black tie, champagne toast at midnight",
+    "actual_output": "{\"name\": \"New Year Eve Gala\", \"headcount\": 300, \"time\": \"midnight\", \"dietary_notes\": null, \"location\": \"Skyline Rooftop\", \"event_id\": \"mock-event-id-16\"}",
+    "expected_output": "{\"name\": \"New Year Eve Gala\", \"headcount\": 300, \"time\": \"midnight\", \"dietary_notes\": null, \"location\": \"Skyline Rooftop\", \"event_id\": \"mock-event-id-16\"}",
+    "retrieval_context": ["Past event: Christmas party at Skyline Rooftop for 250"]
+  },
+  {
+    "input": "Toddler playdate at the indoor playground, 4 kids, 10am Saturday, bring snacks nut-free please",
+    "actual_output": "{\"name\": \"Toddler Playdate\", \"headcount\": 4, \"time\": \"10am Saturday\", \"dietary_notes\": \"nut-free snacks\", \"location\": \"indoor playground\", \"event_id\": \"mock-event-id-17\"}",
+    "expected_output": "{\"name\": \"Toddler Playdate\", \"headcount\": 4, \"time\": \"10am Saturday\", \"dietary_notes\": \"nut-free snacks\", \"location\": \"indoor playground\", \"event_id\": \"mock-event-id-17\"}",
+    "retrieval_context": ["Past event: Kids birthday party at the playground"]
+  },
+  {
+    "input": "Strategic planning retreat, 2 days, 15 executives, hotel booked near the airport",
+    "actual_output": "{\"name\": \"Strategic Planning Retreat\", \"headcount\": 15, \"time\": \"2 days\", \"dietary_notes\": null, \"location\": \"hotel near the airport\", \"event_id\": \"mock-event-id-18\"}",
+    "expected_output": "{\"name\": \"Strategic Planning Retreat\", \"headcount\": 15, \"time\": \"2 days\", \"dietary_notes\": null, \"location\": \"hotel near the airport\", \"event_id\": \"mock-event-id-18\"}",
+    "retrieval_context": ["Past event: Q1 strategy offsite with 12 directors"]
+  },
+  {
+    "input": "Book club meeting discussing 'The Pragmatic Programmer', 8 members, at the downtown library at 6pm",
+    "actual_output": "{\"name\": \"Book Club Meeting Discussing 'The Pragmatic Programmer'\", \"headcount\": 8, \"time\": \"6pm\", \"dietary_notes\": null, \"location\": \"downtown library\", \"event_id\": \"mock-event-id-19\"}",
+    "expected_output": "{\"name\": \"Book Club Meeting Discussing 'The Pragmatic Programmer'\", \"headcount\": 8, \"time\": \"6pm\", \"dietary_notes\": null, \"location\": \"downtown library\", \"event_id\": \"mock-event-id-19\"}",
+    "retrieval_context": ["Past event: Book club at the downtown library for 6 people"]
+  },
+  {
+    "input": "Emergency team huddle, ASAP, server outage incident, all hands on deck",
+    "actual_output": "{\"name\": \"Emergency Team Huddle\", \"headcount\": 10, \"time\": \"ASAP\", \"dietary_notes\": null, \"location\": null, \"event_id\": \"mock-event-id-20\"}",
+    "expected_output": "{\"name\": \"Emergency Team Huddle\", \"headcount\": 10, \"time\": \"ASAP\", \"dietary_notes\": null, \"location\": null, \"event_id\": \"mock-event-id-20\"}",
+    "retrieval_context": ["Past event: Incident response call with engineering team"]
+  }
+]
