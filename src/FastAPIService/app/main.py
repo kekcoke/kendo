@@ -14,8 +14,18 @@ from app.config import Settings
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan — startup and shutdown hooks."""
     settings = app.state.settings
-    app.state.healthy = True  # Always live; readiness checks dependency state
+
+    # Initialize pgvector pool if DSN is configured
+    if settings.vector_read_dsn:
+        from app.db import create_pool
+        await create_pool(settings.vector_read_dsn)
+
     yield
+
+    # Teardown
+    if settings.vector_read_dsn:
+        from app.db import close_pool
+        await close_pool()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

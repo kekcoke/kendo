@@ -33,3 +33,16 @@ class Settings(BaseSettings):
     port: int = 8000
     reload: bool = True
     log_level: str = "info"
+
+    # --- pgvector (read-only, fastapi_ro role) ---
+    vector_read_dsn: str = ""
+
+    # --- LLM / Azure OpenAI ---
+    llm_endpoint: str = ""
+    llm_api_key: str = ""
+    llm_deployment_name: str = ""
+    llm_api_version: str = "2024-02-15-preview"
+
+    # --- Embedding model ---
+    embedding_model: str = "BGE-large-en-v1.5"
+    embedding_dimension: int = 1024
