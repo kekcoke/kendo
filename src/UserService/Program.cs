@@ -38,6 +38,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<ResilientAppDbContext>();
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<OutboxRepository>();
+builder.Services.AddScoped<AdminWriterConnectionFactory>();
 builder.Services.AddHostedService<OutboxRelayService>();
 
 var app = builder.Build();
