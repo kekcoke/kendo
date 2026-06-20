@@ -9,6 +9,8 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from app.observability.tracing import get_current_trace_id
+
 
 def add_problem_details_handler(app: FastAPI) -> None:
     """Register the RFC 7807 exception handler on the FastAPI app."""
@@ -29,7 +31,7 @@ def add_problem_details_handler(app: FastAPI) -> None:
                 "title": _status_title(status_code),
                 "status": status_code,
                 "detail": detail,
-                "trace_id": "",  # Populated by OpenTelemetry middleware (M5.5+)
+                "trace_id": get_current_trace_id(),
             },
             headers={"Content-Type": "application/problem+json"},
         )

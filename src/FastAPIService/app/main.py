@@ -15,6 +15,31 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan — startup and shutdown hooks."""
     settings = app.state.settings
 
+    # Initialize OpenTelemetry tracing
+    from app.observability.tracing import init_tracing
+    init_tracing(settings)
+
+    # Initialize circuit breakers and store in app state
+    from app.resilience.circuit_breaker import create_pgvector_breaker, create_openai_breaker
+    from app.db import set_pgvector_breaker
+
+    pgv_breaker = create_pgvector_breaker(
+        fail_max=settings.breaker_pgvector_fail_max,
+        reset_timeout=settings.breaker_pgvector_reset_timeout,
+    )
+    oai_breaker = create_openai_breaker(
+        fail_max=settings.breaker_openai_fail_max,
+        reset_timeout=settings.breaker_openai_reset_timeout,
+    )
+
+    app.state.resilience = {
+        "pgvector_breaker": pgv_breaker,
+        "openai_breaker": oai_breaker,
+    }
+
+    # Wire pgvector breaker into db module
+    set_pgvector_breaker(pgv_breaker)
+
     # Initialize pgvector pool if DSN is configured
     if settings.vector_read_dsn:
         from app.db import create_pool
@@ -43,9 +68,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
 
     # --- Middleware ---
-    # Registered in order: auth -> problem details -> rate limit (future)
+    # Registered in order: auth -> trace propagation -> problem details
     # Auth middleware: health endpoints are exempted via EXEMPT_PATHS
     from app.middleware.auth import JWTAuthMiddleware
+    from app.middleware.trace_propagation import TracePropagationMiddleware
     from app.middleware.problem_details import add_problem_details_handler
 
     app.add_middleware(
@@ -54,6 +80,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         audience=settings.jwt_audience,
         issuer=settings.jwt_issuer,
     )
+    app.add_middleware(TracePropagationMiddleware)
     add_problem_details_handler(app)
 
     # --- Routes ---
