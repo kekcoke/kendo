@@ -317,20 +317,20 @@ that drives implementation is `docs/architecture/fastapi_rag_service_spec.md`.
 
 | Component | Description | Status |
 |---|---|---|
-| `FastAPIService` (Python) | `src/FastAPIService/` — FastAPI + Uvicorn, JWT auth, RFC 7807, OpenTelemetry, health endpoints | ~ (planned) |
+| `FastAPIService` (Python) | `src/FastAPIService/` — FastAPI + Uvicorn, JWT auth, RFC 7807, OpenTelemetry, health endpoints | ✅ (Day 21) |
 | `LangChain RAG Pipeline` | `RetrievalQA` chain, versioned prompt templates, sync + SSE streaming | ~ (planned) |
 | `pgvector Read-Only Role` | `fastapi_ro` PostgreSQL role provisioned by `UserService` migration; SELECT-only grants | ~ (planned) |
 | `pybreaker` | Circuit breaker per external dependency (pgvector, Azure OpenAI) with state metrics | ~ (planned) |
 | `tenacity` Retry | Exponential backoff + jitter, transient-fault predicate, span-event visibility | ~ (planned) |
-| `RFC 7807 Problem Details` | FastAPI exception handler returning `application/problem+json` with `trace_id` | ~ (planned) |
+| `RFC 7807 Problem Details` | FastAPI exception handler returning `application/problem+json` with `trace_id` | ✅ (Day 21) |
 | `OpenTelemetry (FastAPI)` | `opentelemetry-instrumentation-fastapi`, `-asyncpg`, `-httpx`; OTLP exporter | ~ (planned) |
 | `Trace Correlation (FastAPI)` | `traceparent` extracted from Gateway request; embedded in every SSE event | ~ (planned) |
 | `Gateway → FastAPI Client` | Typed `IFastAPIClient` with Polly timeout + circuit breaker; `/api/rag/{sync,stream}` route | ~ (planned) |
 | `FastAPI Rate Limiter` | Token-bucket per JWT subject; `429 + Retry-After` | ~ (planned) |
 | `FastAPI Chaos Suite` | xUnit (.NET side) + pytest (Python side); DB down, Azure OpenAI down, crash, slow stream | ~ (planned) |
-| `FastAPI Runbook` | `ops/runbooks/fastapi_service.md` — failure-mode playbook | ~ (planned) |
-| `FastAPI Dockerfile` | Multi-stage `python:3.12-slim`, non-root user, health check | ~ (planned) |
-| `docker compose` (FastAPI service) | Internal-network port `8000`, health check wired to Docker, ≥ 2 replicas when Phase 03 HA standards apply | ~ (planned) |
+| `FastAPI Runbook` | `ops/runbooks/day_21_runbook.md` — scaffold verification and rollback | ✅ (Day 21) |
+| `FastAPI Dockerfile` | Multi-stage `python:3.12-slim`, non-root user, health check | ✅ (Day 21) |
+| `docker compose` (FastAPI service) | Internal-network port `8000`, health check wired to Docker, ≥ 2 replicas when Phase 03 HA standards apply | ✅ (Day 21) |
 | **W1 — Event Ingestion RAG** (M5.7) | `POST /api/events/ingest` — free-form text → structured `Event` JSON via LangChain + pgvector retrieval | ~ (planned) |
 | **W2 — Event Conflict & Schedule Reasoning** (M5.8) | `POST /api/events/{id}/validate` — multi-step reasoning tool-use, audit trace returned | ~ (planned) |
 | **W3 — User Profile Semantic Search** (M5.9) | `GET /api/users/search?q=...` — hybrid pgvector cosine + Postgres BM25 | ~ (planned) |
