@@ -119,4 +119,86 @@ public class RagController : ControllerBase
             });
         }
     }
+
+    // ============================================================
+    // M5.4 — Generic RAG routes (proxied to FastAPI /v1/rag/*)
+    // ============================================================
+
+    /// <summary>
+    /// M5.4 — Synchronous RAG query. GET with query params, proxies to FastAPI POST /v1/rag/query.
+    /// </summary>
+    [HttpGet("rag/query")]
+    public async Task<IActionResult> RagQuery(
+        [FromQuery] string q,
+        [FromQuery] int top_k = 5,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(q))
+            return BadRequest(new { error = "Query parameter 'q' is required" });
+
+        try
+        {
+            var result = await _fastApi.RagQueryAsync(
+                new RagQueryRequest(q, top_k), ct);
+
+            _logger.LogInformation("RAG query: top_k={TopK}, trace={TraceId}", top_k, result.TraceId);
+
+            return Ok(new
+            {
+                answer = result.Answer,
+                contexts = result.Contexts,
+                traceId = result.TraceId
+            });
+        }
+        catch (FastApiClientException ex)
+        {
+            return StatusCode(ex.Error.StatusCode, new
+            {
+                error = ex.Error.Title,
+                detail = ex.Error.Detail
+            });
+        }
+    }
+
+    /// <summary>
+    /// M5.4 — Streaming RAG query (SSE). GET with query params, proxies to FastAPI POST /v1/rag/stream.
+    /// </summary>
+    [HttpGet("rag/stream")]
+    public async Task RagQueryStream(
+        [FromQuery] string q,
+        [FromQuery] int top_k = 5,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(q))
+        {
+            Response.StatusCode = 400;
+            await Response.WriteAsync(
+                "data: {\"type\":\"error\",\"text\":\"Query parameter 'q' is required\",\"isDone\":true}\n\n", ct);
+            await Response.Body.FlushAsync(ct);
+            return;
+        }
+
+        Response.Headers["Content-Type"] = "text/event-stream";
+        Response.Headers["Cache-Control"] = "no-cache";
+        Response.Headers["Connection"] = "keep-alive";
+
+        try
+        {
+            await foreach (var chunk in _fastApi.RagQueryStreamAsync(
+                new RagQueryRequest(q, top_k), ct))
+            {
+                await Response.WriteAsync(
+                    $"data: {System.Text.Json.JsonSerializer.Serialize(chunk)}\n\n", ct);
+                await Response.Body.FlushAsync(ct);
+
+                if (chunk.IsDone) break;
+            }
+        }
+        catch (FastApiClientException ex)
+        {
+            await Response.WriteAsync(
+                $"data: {{\"type\":\"error\",\"text\":\"{ex.Error.Title}: {ex.Error.Detail}\",\"isDone\":true}}\n\n", ct);
+            await Response.Body.FlushAsync(ct);
+        }
+    }
 }

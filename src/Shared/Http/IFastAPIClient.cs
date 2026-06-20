@@ -22,6 +22,10 @@ public interface IFastAPIClient
 
     // W6 — Document Q&A / Onboarding Assistant
     Task<AssistantAnswerResult> AskAssistantAsync(AssistantQuestionRequest request, CancellationToken ct);
+
+    // M5.4 — Generic RAG query (sync) and streaming RAG (SSE)
+    Task<RagQueryResult> RagQueryAsync(RagQueryRequest request, CancellationToken ct);
+    IAsyncEnumerable<RagStreamChunk> RagQueryStreamAsync(RagQueryRequest request, CancellationToken ct);
 }
 
 // --- DTOs ---
@@ -43,3 +47,9 @@ public record AssistantQuestionRequest(string Question, string? ContextFile);
 public record AssistantAnswerResult(string Answer, Citation[] Citations);
 
 public record Citation(string File, int LineStart, int LineEnd, string Excerpt);
+
+// M5.4 — Generic RAG query DTOs
+public record RagQueryRequest(string Query, int TopK = 5, Dictionary<string, string>? Filters = null);
+public record RagQueryResult(string Answer, RagContext[] Contexts, string TraceId);
+public record RagContext(string Id, string Text, double Score, string Source);
+public record RagStreamChunk(string Type, string? Text, string? TraceId, bool IsDone);
