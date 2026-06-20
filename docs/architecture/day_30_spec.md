@@ -127,4 +127,4 @@ Maps 1:1 to `fastapi_rag_service_spec.md §W5 acceptance gate`:
 - `docs/architecture/fastapi_rag_service_spec.md §W5` — data contracts, acceptance gates
 - M5.2+M5.3 (Day 22) — pgvector read access + embedding model available
 - Day 20 (M0.6) — `EmbeddingAdminController` exists with `admin:writes` scope
-- Day 27 (CF-2) — service-JWT issuance available for FastAPI → UserService calls
+- Day 26 (CF-2) — service-JWT issuance available for FastAPI → UserService calls

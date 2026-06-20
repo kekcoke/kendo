@@ -119,7 +119,7 @@ feat(shared): add NotificationSummarizationClient — first non-Gateway FastAPI 
 
 New INotificationSummarizationClient interface in Kendo.Shared with independent
 Polly pipeline (30s timeout, 3 retry, 3-failure/30s CB). Uses service-JWT minted
-via Gateway's token endpoint (Day 27/CF-2). First external caller of FastAPI that
+via Gateway's token endpoint (Day 26/CF-2). First external caller of FastAPI that
 does NOT route through Gateway.
 
 Day 34 — M5.13 Unit 2 of 3 | Milestone: M5.13 — W7 Event Notification Summarization
@@ -179,6 +179,6 @@ Maps 1:1 to `fastapi_rag_service_spec.md §W7 acceptance gate`:
 
 - `docs/architecture/fastapi_rag_service_spec.md §W7` — data contracts, acceptance gates
 - `docs/architecture/day_19_spec.md` — Worker AI handlers precedent (IFastAPISummarizationClient pattern)
-- Day 27 (CF-2) — service-JWT issuance available for Worker → FastAPI calls
+- Day 26 (CF-2) — service-JWT issuance available for Worker → FastAPI calls
 - `src/Kendo.Shared/` — new interface + implementation
 - `src/Worker/Handlers/EventCreatedHandler.cs` — existing handler, modified

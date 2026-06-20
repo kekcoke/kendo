@@ -31,13 +31,16 @@ public static class AddKendoJwtExtensions
                     ValidAudience = jwt.Audience,
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.FromMinutes(2),
-                    IssuerSigningKeyResolver = (token, securityToken, kid, parameters) =>
-                    {
-                        var provider = services.BuildServiceProvider()
-                            .GetRequiredService<RsaKeyProvider>();
-                        return new[] { provider.GetPublicKey() };
-                    }
                 };
+            });
+
+        // Inject RsaKeyProvider via OptionsBuilder closure — no BuildServiceProvider()
+        services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+            .Configure<RsaKeyProvider>((options, keyProvider) =>
+            {
+                options.TokenValidationParameters.IssuerSigningKeyResolver =
+                    (token, securityToken, kid, parameters) =>
+                        new[] { keyProvider.GetPublicKey() };
             });
 
         return services;
