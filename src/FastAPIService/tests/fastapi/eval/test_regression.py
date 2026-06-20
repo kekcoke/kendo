@@ -211,7 +211,7 @@ def _run_metric_and_check(
         )
     else:
         print(
-            f"ℹ️  No baseline for '{dataset_name}' / {metric_name} — "
+            f"INFO: No baseline for '{dataset_name}' / {metric_name} — "
             f"score {avg_score:.3f} (will become baseline on next regenerate)"
         )
 
@@ -246,15 +246,6 @@ def _run_ragas_metric_and_check(
         )
     else:
         print(
-            f"ℹ️  No baseline for '{dataset_name}' / {metric_name} — "
+            f"INFO: No baseline for '{dataset_name}' / {metric_name} — "
             f"score {avg_score:.3f}"
-        )</RAW_37596>
-    }
-  },
-  {
-    "name": "read_file",
-    "kwargs": {
-      "file_path": "src/FastAPIService/pyproject.toml"
-    }
-  }
-]
+        )
