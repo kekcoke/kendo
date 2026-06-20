@@ -1,3 +1,4 @@
+using Kendo.Shared.Authentication;
 using Kendo.Shared.Caching;
 using Kendo.Shared.ErrorHandling;
 using Kendo.Shared.Messaging;
@@ -22,6 +23,8 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
     options.SuppressModelStateInvalidFilter = true);
 
 builder.Services.AddKendoResilience(builder.Configuration);
+builder.Services.AddKendoJwt(builder.Configuration);
+builder.Services.AddKendoAdminScopePolicies();
 builder.Services.AddKendoObservability(builder.Configuration, "kendo-userservice");
 builder.Services.AddKendoDistributedCache(builder.Configuration);
 builder.Services.AddKendoErrorHandling();
@@ -42,6 +45,8 @@ var app = builder.Build();
 app.UseMiddleware<GracefulShutdownMiddleware>();
 app.UseKendoErrorHandling();
 app.UseKendoReplicaIdentity();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 
