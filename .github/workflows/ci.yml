@@ -73,11 +73,11 @@ jobs:
         run: |
           for i in $(seq 1 20); do
             healthy=$(docker compose ps --format json | grep '"Health":"healthy"' | wc -l)
-            if [ "$healthy" -ge 6 ]; then
-              echo "All 6 services healthy (gateway, userservice, worker, postgres, nginx, redis)."
+            if [ "$healthy" -ge 7 ]; then
+              echo "All 7 services healthy (gateway, userservice, worker, postgres, nginx, redis, fastapi)."
               exit 0
             fi
-            echo "wait ($i/20): $healthy/6 services healthy"
+            echo "wait ($i/20): $healthy/7 services healthy"
             sleep 4
           done
           docker compose ps
