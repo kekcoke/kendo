@@ -35,13 +35,14 @@ class CircuitBreakerListener(pybreaker.CircuitBreakerListener):
         logger.warning("Circuit breaker %s: %s → %s", breaker.name, old, new)
 
 
-def _map_state(state: int) -> CircuitBreakerState:
-    """Map pybreaker internal state to our enum."""
-    if state == pybreaker.STATE_CLOSED:
+def _map_state(state: object) -> CircuitBreakerState:
+    """Map pybreaker internal state object to our enum."""
+    state_name = type(state).__name__
+    if state_name == "CircuitClosedState":
         return CircuitBreakerState.CLOSED
-    elif state == pybreaker.STATE_OPEN:
+    elif state_name == "CircuitOpenState":
         return CircuitBreakerState.OPEN
-    elif state == pybreaker.STATE_HALF_OPEN:
+    elif state_name == "CircuitHalfOpenState":
         return CircuitBreakerState.HALF_OPEN
     return CircuitBreakerState.CLOSED
 

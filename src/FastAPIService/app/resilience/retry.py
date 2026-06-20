@@ -14,6 +14,7 @@ import httpx
 from tenacity import (
     before_sleep_log,
     retry,
+    retry_if_exception,
     retry_if_exception_type,
     stop_after_attempt,
     wait_exponential_jitter,
@@ -36,6 +37,18 @@ LLM_EXCEPTIONS: tuple[Type[Exception], ...] = (
     httpx.RemoteProtocolError,
     httpx.HTTPStatusError,
 )
+
+
+def _retry_if_llm_transient(exc: BaseException) -> bool:
+    """Return True if the exception is a transient LLM error worth retrying.
+
+    Retries on: timeout, connection refused, 5xx HTTP errors.
+    Does NOT retry on: 4xx client errors (Bad Request, Forbidden, etc.).
+    """
+    if isinstance(exc, httpx.HTTPStatusError):
+        status = exc.response.status_code
+        return status >= 500  # Only retry on 5xx server errors
+    return isinstance(exc, (httpx.TimeoutException, httpx.ConnectError, httpx.RemoteProtocolError,))
 
 
 def retry_db(
@@ -87,7 +100,7 @@ def retry_llm(
     return retry(
         stop=stop_after_attempt(max_attempts),
         wait=wait_exponential_jitter(initial=min_wait, max=max_wait, jitter=jitter),
-        retry=retry_if_exception_type(LLM_EXCEPTIONS),
+        retry=retry_if_exception(_retry_if_llm_transient),
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )
