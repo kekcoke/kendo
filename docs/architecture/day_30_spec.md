@@ -1,21 +1,21 @@
-# Architecture Spec — Day 29 — W8: Evaluation & Regression Gate
+# Architecture Spec — Day 30 — W2: Event Conflict & Schedule Reasoning
 
-> **Milestone:** M5.14 — W8 Evaluation & Regression Gate (P0)  
+> **Milestone:** M5.8 — W2 Event Conflict & Schedule Reasoning (second P0 workload)  
 > **Roadmap phase:** 05 — AI/Vector Service (FastAPI)  
 > **Date:** 2026-06-20  
-> **Type:** Infrastructure spec (Case C — no pre-authored spec; adopts `fastapi_rag_service_spec.md §W8` by reference)  
-> **Depends on:** M5.1–M5.6 foundation (all live on `develop`), no workload datasets required (starts empty)
+> **Type:** Workload spec (adopts by reference `fastapi_rag_service_spec.md §W2`)  
+> **Depends on:** `docs/architecture/fastapi_rag_service_spec.md` §W2 (design-spec contract, rev 2026-06-16), Day 28 (M5.7 — pgvector has event embeddings)
 
 ---
 
 ## Milestone Scope
 
-- **What:** Implement the W8 Evaluation & Regression Gate — a `pytest` suite using **DeepEval** (faithfulness, answer relevancy, hallucination) and **Ragas** (context precision/recall) that runs in CI on every PR touching `src/FastAPIService/`. Starts with an **empty dataset** (a 0% baseline). Build fails on any metric regression > 5% vs. the `main` baseline.
-- **Maps to:** `fastapi_rag_service_spec.md §W8 — Evaluation & Regression Gate for LLM Outputs` (data contracts, acceptance gates)
+- **What:** Implement the W2 Event Conflict & Schedule Reasoning workload — `POST /api/events/{id}/validate` on the Gateway proxies to FastAPI `/v1/rag/validate` which runs multi-step reasoning (langgraph tool-use) to detect scheduling conflicts, headcount plausibility, and time collisions.
+- **Maps to:** `fastapi_rag_service_spec.md §W2 — Event Conflict & Schedule Reasoning` (data contracts, acceptance gates)
 - **Explicitly out of scope:**
-  - Individual workload eval datasets (W1 dataset wired on Day 30 during W1 merge)
-  - Nightly `develop` runs (added after first dataset lands)
-  - W2–W7 workload implementation (handled in subsequent days)
+  - W1 (already live from Day 28)
+  - P1/P2 workloads (handled in subsequent days)
+  - W8 eval gate — must already be live on `develop`
 
 ---
 
@@ -23,122 +23,111 @@
 
 | Layer | Service | Change |
 |-------|---------|--------|
-| Test | `tests/fastapi/eval/` | New — eval test directory |
-| Test | `tests/fastapi/eval/conftest.py` | New — eval fixtures, metric configuration |
-| Test | `tests/fastapi/eval/datasets/` | New — golden dataset directory (starts empty, `.gitkeep`) |
-| Test | `tests/fastapi/eval/baseline/` | New — baseline metric snapshots (starts empty) |
-| Test | `tests/fastapi/eval/test_regression.py` | New — regression test suite with DeepEval + Ragas metrics |
-| App | `pyproject.toml` | Modify — add `deepeval`, `ragas` dependencies |
-| CI | `.github/workflows/ci.yml` | Modify — add `eval-gate` job |
-| Ops | `ops/runbooks/day_29_runbook.md` | New — W8 eval gate runbook |
+| Application | `src/FastAPIService/app/api/v1/validate.py` | New — `POST /v1/rag/validate` endpoint |
+| Application | `src/FastAPIService/app/rag/validate_chain.py` | New — langgraph reasoning chain (tool-use for date math, venue lookup, conflict detection) |
+| Application | `src/Gateway/Controllers/RagController.cs` | Modify — add `POST /api/events/{id}/validate` route proxying to FastAPI |
+| Application | `src/Gateway/Services/FastAPIClient.cs` | Modify — add `ValidateAsync` method |
+
+---
+
+## Data Contracts
+
+Adopted by reference from `fastapi_rag_service_spec.md §W2 — Event Conflict & Schedule Reasoning` (rev 2026-06-16). Key contract:
+
+**Gateway → FastAPI:**
+```
+POST /v1/rag/validate
+{
+  "event": { /* structured Event JSON from W1 output */ },
+  "user_id": "uuid"
+}
+```
+
+**FastAPI → Gateway response:**
+```json
+{
+  "ok": true,
+  "conflicts": [],
+  "suggestions": [],
+  "reasoning_trace": [{"step": "check_date_overlap", "result": "no conflict"}]
+}
+```
 
 ---
 
 ## Implementation Plan (Commit Units)
 
-### Unit 1 — Eval framework scaffold + empty dataset
+### Unit 1 — FastAPI validation endpoint + langgraph reasoning chain
 
 **Files:**
-- `src/FastAPIService/tests/fastapi/eval/__init__.py` — empty
-- `src/FastAPIService/tests/fastapi/eval/conftest.py` — eval settings, DeepEval/Ragas metric factory fixtures, dataset loader stub
-- `src/FastAPIService/tests/fastapi/eval/datasets/.gitkeep` — empty dataset dir
-- `src/FastAPIService/tests/fastapi/eval/baseline/.gitkeep` — empty baseline dir
-- `src/FastAPIService/tests/fastapi/eval/test_regression.py` — regression test skeleton with metric placeholders, parametrized over datasets
-- `src/FastAPIService/pyproject.toml` — add `deepeval`, `ragas`
+- `src/FastAPIService/app/api/v1/validate.py` — `POST /v1/rag/validate` route
+- `src/FastAPIService/app/rag/validate_chain.py` — langgraph chain with tool-use (date math, pgvector recent-events retriever, venue-lookup stub)
+- `tests/fastapi/test_validate.py` — unit + integration tests
 
-**Gate command:** `pytest tests/fastapi/eval/ -v` — must exit 0 (empty dataset, all metrics report "no data" gracefully).
+**Gate command:** `pytest tests/fastapi/test_validate.py` — must exit 0 with zero false-negatives on conflict regression set.
 
 **Commit message:**
 ```
-feat(eval): add W8 eval gate scaffold — DeepEval + Ragas, empty dataset
+feat(fastapi): add W2 validate endpoint — multi-step conflict reasoning via langgraph
 
-Creates tests/fastapi/eval/ with:
-- conftest.py: eval settings, metric factory (faithfulness, answer_relevancy,
-  context_precision, context_recall)
-- test_regression.py: regression test suite with parametrized dataset loading
-- datasets/: golden dataset directory (empty, .gitkeep)
-- baseline/: baseline metric snapshots (empty, .gitkeep)
-- pyproject.toml: add deepeval>=1.0.0, ragas>=0.2.0
+POST /v1/rag/validate takes candidate Event + user_id, queries pgvector for
+recent events, runs langgraph tool-use chain (date overlap, headcount plausibility,
+recurring-event collision), returns ValidationResult with reasoning trace.
+Implements fastapi_rag_service_spec.md §W2.
 
-Empty dataset = 0% baseline. Datasets added by each workload on merge.
-Gate command: pytest tests/fastapi/eval/ -v
-
-Day 29 — M5.14 Unit 1 of 3 | Milestone: M5.14 — W8 Evaluation & Regression Gate
+Day 30 — M5.8 Unit 1 of 2 | Milestone: M5.8 — W2 Event Conflict & Schedule Reasoning
+Coverage: Zero false-negatives on conflict regression set
 Lint: clean
 ```
 
-### Unit 2 — CI eval-gate job
+### Unit 2 — Gateway route: POST /api/events/{id}/validate
 
 **Files:**
-- `.github/workflows/ci.yml` — add `eval-gate` job:
-  - Trigger: `paths: ['src/FastAPIService/**', 'tests/fastapi/eval/**']`
-  - Steps: setup Python, install deps, `pytest tests/fastapi/eval/ --junitxml=eval-report.xml`
-  - Upload artifact: `eval-report.xml`
-  - Fails build on > 5% regression vs baseline (DeepEval metric thresholds in test config)
+- `src/Gateway/Controllers/RagController.cs` — add `POST /api/events/{id}/validate`
+- `src/Gateway/Services/IFastAPIClient.cs` — add `ValidateAsync`
+- `src/Gateway/Services/FastAPIClient.cs` — implement `ValidateAsync`
+- `tests/Kendo.Tests/Integration/FastAPIWorkloadTests.cs` — add W2 integration tests
 
-**Gate command:** `cat .github/workflows/ci.yml | grep -A30 "eval-gate"` — CI job definition present.
+**Gate command:** `dotnet test tests/Kendo.Tests --filter "Category=FastAPIW2"` — must exit 0.
 
 **Commit message:**
 ```
-ci(eval): add eval-gate CI job — regression gate for FastAPI changes
+feat(gateway): add W2 validate route — POST /api/events/{id}/validate proxies to FastAPI
 
-New eval-gate job runs pytest tests/fastapi/eval/ on every PR touching
-src/FastAPIService/. Fails build on >5% metric regression. Results uploaded
-as CI artifact.
+Creates ValidateAsync on IFastAPIClient. Gateway returns reasoning_trace in
+response for auditability. RFC 7807 on FastAPI failure.
 
-Day 29 — M5.14 Unit 2 of 3 | Milestone: M5.14 — W8 Evaluation & Regression Gate
-```
-
-### Unit 3 — Baseline management + runbook
-
-**Files:**
-- `src/FastAPIService/tests/fastapi/eval/regenerate_baseline.py` — script to re-run eval suite and store metric snapshots as baseline
-- `ops/runbooks/day_29_runbook.md` — deployment, verification, adding datasets, regenerating baselines
-- `docs/architecture/day_29_review_report.md` — Phase 4b review artifact
-
-**Gate command:** `python -m pytest tests/fastapi/eval/ -v --co` — quick-check passes, runbook readable.
-
-**Commit message:**
-```
-chore(eval): add baseline management script + W8 runbook
-
-- regenerate_baseline.py: re-runs eval suite, persists metric snapshots
-- ops/runbooks/day_29_runbook.md: deployment, CI gate verification,
-  adding workload datasets, baseline regeneration
-- day_29_review_report.md: Phase 4b gate check
-
-Day 29 — M5.14 Unit 3 of 3 | Milestone: M5.14 — W8 Evaluation & Regression Gate
+Day 30 — M5.8 Unit 2 of 2 | Milestone: M5.8 — W2 Event Conflict & Schedule Reasoning
+Coverage: 100% new integration tests
+Lint: clean
 ```
 
 ---
 
 ## Success Checklist
 
-Maps 1:1 to `fastapi_rag_service_spec.md §W8 acceptance gate`:
+Maps 1:1 to `fastapi_rag_service_spec.md §W2 acceptance gate`:
 
-| # | Criterion | How Verified |
-|---|-----------|-------------|
-| 1 | `pytest tests/fastapi/eval/` runs in CI on every PR touching `src/FastAPIService/` | CI job exists, trigger paths correct |
-| 2 | Build fails on any metric regression > 5% vs. `main` baseline | DeepEval metric thresholds in test assertions |
-| 3 | Eval dataset is versioned in git (regressions reproducible) | `tests/fastapi/eval/datasets/` git-tracked |
-| 4 | Suite completes in ≤ 10 minutes in CI | Empty dataset = < 1m; realistic limit with `pytest --co` quick-check |
-| 5 | Results uploaded as CI artifact | `actions/upload-artifact` on `eval-report.xml` |
-| 6 | Baseline snapshots storable and regenerable | `regenerate_baseline.py` script provided |
+| # | Criterion | Maps to |
+|---|-----------|---------|
+| 1 | Zero false-negatives on the conflict regression test set (a conflict is never missed) | M5.8 acceptance |
+| 2 | False-positive rate ≤ 5% on the conflict regression set | M5.8 acceptance |
+| 3 | Reasoning trace returned with every response (array of {step, result}) | M5.8 acceptance |
+| 4 | LangGraph tool-use chain completes within p95 budget (≤ 15s for multi-step) | M5.8 acceptance |
+| 5 | M5.14 (W8) eval gate live on `develop` | P0 ordering rule |
 
 ---
 
 ## Resilience Mandate
 
-The eval gate itself has no direct resilience requirements (it's a CI-only tool). However:
-
-- **Graceful degradation:** Empty dataset = all metrics report "no data" without erroring
-- **Independent from production:** Eval suite runs standalone, no FastAPI app instance required
-- **Fail-safe:** DeepEval `assert_test()` raises `AssertionError` on metric failure, which pytest converts to a test failure → CI build failure
+- Same pybreaker + tenacity pattern as Day 28 (M5.7). No new resilience config.
+- Gateway `ValidateAsync` uses existing `IFastAPIClient` Polly pipeline.
+- LangGraph tool-use chain has a per-tool timeout (10s per tool call, enforced by `asyncio.wait_for`).
 
 ---
 
 ## Depends on
 
-- `docs/architecture/fastapi_rag_service_spec.md §W8` — design-spec contract
-- M5.1–M5.6 foundation (FastAPI scaffold, pgvector, LangChain, resilience) — all live on `develop`
-- No workload datasets required — starts empty per spec
+- `docs/architecture/fastapi_rag_service_spec.md §W2` — data contracts, acceptance gates
+- Day 28 (M5.7) — pgvector has event embeddings from W1
+- `src/Gateway/Services/IFastAPIClient.cs` — extended with `ValidateAsync`
