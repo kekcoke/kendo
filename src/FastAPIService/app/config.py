@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     rate_limit_window_seconds: int = 60
     rate_limit_bucket_capacity: int = 100
 
+    # --- UserService integration (W5 backfill) ---
+    user_service_base_url: str = "http://userservice:5001"
+    user_service_timeout: int = 30
+
     # --- OpenTelemetry ---
     otel_service_name: str = "kendo-fastapi"
     otel_exporter_otlp_endpoint: str = ""  # empty = console exporter fallback
