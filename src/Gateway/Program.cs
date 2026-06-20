@@ -1,4 +1,5 @@
 using Kendo.Shared.Authentication;
+using static Kendo.Shared.Authentication.AdminScopePoliciesExtensions;
 using Kendo.Shared.Caching;
 using Kendo.Shared.ErrorHandling;
 using Kendo.Shared.Http;
@@ -25,6 +26,9 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 
 // JWT authentication
 builder.Services.AddKendoJwt(builder.Configuration);
+
+// Token issuance service (user JWT minting)
+builder.Services.AddSingleton<ITokenService, TokenService>();
 
 // Authorization policies (shared with day_20)
 builder.Services.AddKendoAdminScopePolicies();

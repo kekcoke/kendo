@@ -5,13 +5,14 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Kendo.Shared.Authentication;
 
 /// <summary>
-/// Authorization policies for the admin:writes scope.
-/// Enforces that the token has scope: "admin:writes" AND token_use: "service".
-/// User JWTs with matching scope are rejected — only service JWTs pass.
+/// Authorization policies for admin-scoped operations.
+/// Enforces that the token has the required scope AND token_use: "service".
+/// User JWTs are rejected — only service JWTs pass.
 /// </summary>
 public static class AdminScopePoliciesExtensions
 {
     public const string AdminWritesPolicy = "admin:writes";
+    public const string AdminTokenPolicy = "AdminToken";
 
     public static IServiceCollection AddKendoAdminScopePolicies(this IServiceCollection services)
     {
@@ -21,6 +22,17 @@ public static class AdminScopePoliciesExtensions
             {
                 policy.RequireAuthenticatedUser();
                 policy.RequireClaim("scope", "admin:writes");
+                policy.RequireAssertion(context =>
+                {
+                    var tokenUse = context.User.FindFirst("token_use")?.Value;
+                    return tokenUse == "service";
+                });
+            });
+
+            options.AddPolicy(AdminTokenPolicy, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireClaim("scope", "admin:token");
                 policy.RequireAssertion(context =>
                 {
                     var tokenUse = context.User.FindFirst("token_use")?.Value;
