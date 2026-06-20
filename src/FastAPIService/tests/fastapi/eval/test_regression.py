@@ -98,6 +98,8 @@ class TestEvalRegression:
         """Evaluate faithfulness metric — scores must not regress > 5% vs baseline."""
         if not test_cases:
             pytest.skip(f"Dataset '{dataset_name}' is empty — no test cases to evaluate")
+        if not metric_factory:
+            pytest.skip("DeepEval not available — set OPENAI_API_KEY")
 
         metric = metric_factory["faithfulness"]
         _run_metric_and_check(metric, "faithfulness", test_cases, dataset_name, baseline)
@@ -117,6 +119,8 @@ class TestEvalRegression:
         """Evaluate answer relevancy metric."""
         if not test_cases:
             pytest.skip(f"Dataset '{dataset_name}' is empty — no test cases to evaluate")
+        if not metric_factory:
+            pytest.skip("DeepEval not available — set OPENAI_API_KEY")
 
         metric = metric_factory["answer_relevancy"]
         _run_metric_and_check(metric, "answer_relevancy", test_cases, dataset_name, baseline)
@@ -136,6 +140,8 @@ class TestEvalRegression:
         """Evaluate hallucination metric — lower is better (< threshold)."""
         if not test_cases:
             pytest.skip(f"Dataset '{dataset_name}' is empty — no test cases to evaluate")
+        if not metric_factory:
+            pytest.skip("DeepEval not available — set OPENAI_API_KEY")
 
         metric = metric_factory["hallucination"]
         _run_metric_and_check(metric, "hallucination", test_cases, dataset_name, baseline)
