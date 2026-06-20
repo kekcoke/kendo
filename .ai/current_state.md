@@ -9,9 +9,9 @@
 
 ```yaml
 current_day: 22
-current_phase: 0        # Phase 0 ready for next session
+current_phase: 1        # Phase 1 complete — day_22_spec.md created
 branch_base: develop
-feature_branch: TBD  # resolved by next session Phase 1 {{SLUG}}
+feature_branch: TBD  # resolved by Phase 1 {{SLUG}}
 phase_plan: "05"        # AI/Vector Service (FastAPI)
 ```
 
