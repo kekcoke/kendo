@@ -106,4 +106,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(ingest_router)
 
+    # W2 — Event Validation route (M5.8)
+    from app.api.v1.validate import router as validate_router
+
+    app.include_router(validate_router)
+
     return app
