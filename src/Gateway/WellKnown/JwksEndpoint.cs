@@ -1,12 +1,12 @@
 using Kendo.Shared.Authentication;
 using Microsoft.IdentityModel.Tokens;
-using System.Security.Cryptography;
 
 namespace Kendo.Gateway.WellKnown;
 
 /// <summary>
-/// Minimal API endpoint that publishes the Gateway's public RSA key
+/// Minimal API endpoint that publishes the Gateway's valid public RSA keys
 /// in JWK format at /.well-known/jwks.json (RFC 7517).
+/// During rotation overlap, returns both current and previous keys.
 /// </summary>
 public static class JwksEndpoint
 {
@@ -14,32 +14,30 @@ public static class JwksEndpoint
     {
         app.MapGet("/.well-known/jwks.json", (RsaKeyProvider keys) =>
         {
-            var publicKey = keys.GetPublicKey();
-            var rsa = publicKey.Rsa ?? throw new InvalidOperationException("RSA key not initialized");
+            var validKeys = keys.GetAllValidPublicKeys();
 
-            var parameters = rsa.ExportParameters(includePrivateParameters: false);
-
-            // Base64url encode the modulus and exponent per RFC 7518
-            var n = Base64UrlEncoder.Encode(parameters.Modulus!);
-            var e = Base64UrlEncoder.Encode(parameters.Exponent!);
-
-            var jwk = new
+            var jwkArray = validKeys.Select(kv =>
             {
-                keys = new[]
-                {
-                    new
-                    {
-                        kty = "RSA",
-                        use = "sig",
-                        alg = "RS256",
-                        kid = keys.CurrentKeyId(),
-                        n,
-                        e
-                    }
-                }
-            };
+                var (keyId, key) = kv;
+                var rsa = key.Rsa ?? throw new InvalidOperationException($"RSA key {keyId} not initialized");
 
-            return Results.Json(jwk);
+                var parameters = rsa.ExportParameters(includePrivateParameters: false);
+
+                var n = Base64UrlEncoder.Encode(parameters.Modulus!);
+                var e = Base64UrlEncoder.Encode(parameters.Exponent!);
+
+                return new
+                {
+                    kty = "RSA",
+                    use = "sig",
+                    alg = "RS256",
+                    kid = keyId,
+                    n,
+                    e
+                };
+            }).ToArray();
+
+            return Results.Json(new { keys = jwkArray });
         }).AllowAnonymous();
 
         return app;
