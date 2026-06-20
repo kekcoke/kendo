@@ -18,7 +18,26 @@ async def health_live() -> dict[str, str]:
 async def health_ready(request: Request) -> Response:
     """Readiness probe — returns 200 when all dependencies are reachable.
 
-    At M5.1 scaffold stage, always returns ready.
-    Will be wired to pgvector + Azure OpenAI checks in M5.3+.
+    Checks: pgvector reachable (if DSN configured).
+    Returns 503 RFC 7807 with failing dependency named.
     """
+    settings = request.app.state.settings
+
+    # Check pgvector if configured
+    if settings.vector_read_dsn:
+        from app.db import check_connection
+
+        if not await check_connection():
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "type": "about:blank",
+                    "title": "Service Unavailable",
+                    "status": 503,
+                    "detail": "pgvector not reachable",
+                    "trace_id": "",
+                },
+                headers={"Content-Type": "application/problem+json"},
+            )
+
     return JSONResponse(content={"status": "ready"})

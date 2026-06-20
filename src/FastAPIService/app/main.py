@@ -62,4 +62,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(health_router)
 
+    # RAG routes — JWT-protected by middleware
+    from app.api.v1.rag import router as rag_router
+
+    app.include_router(rag_router)
+
     return app
