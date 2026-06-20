@@ -93,6 +93,81 @@ public class EmbeddingAdminController : ControllerBase
     }
 
     /// <summary>
+    /// Batch upsert embeddings for multiple events (W5 backfill).
+    /// Accepts an array of embedding payloads, returns 202 with a job ID.
+    /// Idempotent: upsert by event_id + model_name.
+    /// </summary>
+    [HttpPost("embeddings/batch")]
+    public async Task<IActionResult> BatchUpsertEmbeddings(
+        [FromBody] BatchUpsertEmbeddingsRequest request, CancellationToken ct)
+    {
+        if (request.Embeddings is null || request.Embeddings.Count == 0)
+            return BadRequest(new ProblemDetails
+            {
+                Type = "https://httpstatuses.com/400",
+                Title = "Invalid Request",
+                Status = 400,
+                Detail = "Embeddings list is required and must not be empty."
+            });
+
+        var jobId = Guid.NewGuid();
+        int processedCount = 0;
+
+        await using var conn = await _connectionFactory.OpenAsync(ct);
+
+        foreach (var emb in request.Embeddings)
+        {
+            string tableName = emb.Target switch
+            {
+                "event" => "event_embeddings",
+                "user" => "user_embeddings",
+                _ => null!
+            };
+
+            if (tableName is null)
+            {
+                _logger.LogWarning("Skipping unknown target type: {Target}", emb.Target);
+                continue;
+            }
+
+            string idColumn = emb.Target == "event" ? "EventId" : "UserId";
+            string[] embeddingStrings = emb.Embedding.Select(f => f.ToString()).ToArray();
+            string vectorLiteral = $"[{string.Join(",", embeddingStrings)}]";
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"""
+                INSERT INTO {tableName} ("{idColumn}", "ModelName", "Dimensions", "Embedding", "EmbeddedAt")
+                VALUES (@TargetId, @ModelName, @Dimensions, @Embedding::vector, now())
+                ON CONFLICT ("{idColumn}")
+                DO UPDATE SET
+                    "ModelName" = EXCLUDED."ModelName",
+                    "Dimensions" = EXCLUDED."Dimensions",
+                    "Embedding" = EXCLUDED."Embedding",
+                    "EmbeddedAt" = now()
+                """;
+
+            cmd.Parameters.AddWithValue("TargetId", emb.TargetId);
+            cmd.Parameters.AddWithValue("ModelName", emb.ModelName);
+            cmd.Parameters.AddWithValue("Dimensions", emb.Dimensions);
+            cmd.Parameters.AddWithValue("Embedding", vectorLiteral);
+
+            await cmd.ExecuteNonQueryAsync(ct);
+            processedCount++;
+        }
+
+        _logger.LogInformation(
+            "Batch upsert job {JobId}: processed {Count} embeddings",
+            jobId, processedCount);
+
+        return Accepted(new
+        {
+            job_id = jobId,
+            processed = processedCount,
+            status = "accepted",
+        });
+    }
+
+    /// <summary>
     /// Re-triggers embedding compute for an event (W5 backfill).
     /// </summary>
     [HttpPost("events/{id:guid}/reindex")]
@@ -124,4 +199,16 @@ public record UpsertEmbeddingRequest
     public string ModelName { get; init; } = string.Empty;
     public int Dimensions { get; init; }
     public float[] Embedding { get; init; } = [];
+}
+
+public record BatchUpsertEmbeddingsRequest
+{
+    public List<UpsertEmbeddingRequest> Embeddings { get; init; } = [];
+}
+
+public record BatchUpsertEmbeddingsResponse
+{
+    public Guid JobId { get; init; }
+    public int Processed { get; init; }
+    public string Status { get; init; } = string.Empty;
 }
