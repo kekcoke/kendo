@@ -320,11 +320,11 @@ that drives implementation is `docs/architecture/fastapi_rag_service_spec.md`.
 | `FastAPIService` (Python) | `src/FastAPIService/` — FastAPI + Uvicorn, JWT auth, RFC 7807, OpenTelemetry, health endpoints | ✅ (Day 21) |
 | `LangChain RAG Pipeline` | `RetrievalQA` chain, versioned prompt templates, sync + SSE streaming | ✅ (Day 22) |
 | `pgvector Read-Only Role` | `fastapi_ro` PostgreSQL role provisioned by `UserService` migration; SELECT-only grants via asyncpg | ✅ (Day 22) |
-| `pybreaker` | Circuit breaker per external dependency (pgvector, Azure OpenAI) with state metrics | ~ (planned) |
-| `tenacity` Retry | Exponential backoff + jitter, transient-fault predicate, span-event visibility | ~ (planned) |
+| `pybreaker` | Circuit breaker per external dependency (pgvector, Azure OpenAI) with state metrics | ✅ (Day 24) |
+| `tenacity` Retry | Exponential backoff + jitter, transient-fault predicate, span-event visibility | ✅ (Day 24) |
 | `RFC 7807 Problem Details` | FastAPI exception handler returning `application/problem+json` with `trace_id` | ✅ (Day 21) |
-| `OpenTelemetry (FastAPI)` | `opentelemetry-instrumentation-fastapi`, `-asyncpg`, `-httpx`; OTLP exporter | ~ (planned) |
-| `Trace Correlation (FastAPI)` | `traceparent` extracted from Gateway request; embedded in every SSE event | ~ (planned) |
+| `OpenTelemetry (FastAPI)` | `opentelemetry-instrumentation-fastapi`, `-asyncpg`, `-httpx`; OTLP exporter | ✅ (Day 24) |
+| `Trace Correlation (FastAPI)` | `traceparent` extracted from Gateway request; embedded in every SSE event | ✅ (Day 24) |
 | `Gateway → FastAPI Client` | Typed `IFastAPIClient` with Polly timeout + circuit breaker; `/api/rag/{sync,stream}` route | ✅ (Day 23) |
 | `FastAPI Rate Limiter` | Token-bucket per JWT subject; `429 + Retry-After` | ~ (planned) |
 | `FastAPI Chaos Suite` | xUnit (.NET side) + pytest (Python side); DB down, Azure OpenAI down, crash, slow stream | ~ (planned) |

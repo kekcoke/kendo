@@ -8,10 +8,10 @@
 ## Session Variables
 
 ```yaml
-current_day: 24
-current_phase: 0        # Phase 0 — Day 24: M5.5 Resilience parity
+current_day: 25
+current_phase: 0        # Phase 0 ready for next session
 branch_base: develop
-feature_branch: feature/day-24-pybreaker-tenacity-resilience
+feature_branch: TBD  # resolved by next session Phase 1 {{SLUG}}
 phase_plan: "05"        # AI/Vector Service (FastAPI)
 ```
 
@@ -20,8 +20,8 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* **M5.4 complete** — Gateway → FastAPI RAG routing implemented across 6 files, +506 additions. `IFastAPIClient.RagQueryAsync`/`RagQueryStreamAsync` with existing Polly pipeline; Gateway `GET /api/rag/query` and `GET /api/rag/stream` routes; 5 unit tests (Category=Unit, all passing). PR #29 squash-merged into `develop`.
-* **Phase 05 progressing** — M5.1 (scaffold) + M5.2 (RAG) + M5.3 (pgvector) + M5.4 (Gateway routing) now ✅. 8 components complete. Next: M5.5 — Resilience parity (pybreaker + tenacity).
+* **M5.5 complete** — FastAPI resilience parity delivered: `pybreaker` circuit breakers (pgvector + Azure OpenAI, independent), `tenacity` retry with exponential backoff + jitter (DB + LLM, 4xx exclusion), OpenTelemetry tracing (OTLP/console exporter, `trace_id` in RFC 7807, `traceparent` propagation), 18 unit tests. PR #30 squash-merged into `develop`.
+* **Phase 05 progressing** — M5.1 (scaffold) + M5.2 (RAG) + M5.3 (pgvector) + M5.4 (Gateway routing) + M5.5 (resilience parity) now ✅. 11 components complete. Next: M5.6 — Observability + chaos + runbook.
 * Carry-forward maintained: chaos-test CI flakiness (`test_db_downtime`) — still documented in M3.6 runbooks. Day 17 open questions (IssuerSigningKeyResolver refactor, no user JWT issuance, no rotation BackgroundService) carried forward.
 
 ---
@@ -280,11 +280,11 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 |---|---|---|
 | 0 | State initialized, variables resolved → M5.5 Resilience parity | ✅ |
 | 0b | *Skipped* (repo has prior commits) | ✅ |
-| 1 | `docs/architecture/day_24_spec.md` | ⏳ |
-| 2 | Commit log — 4/4 units committed, zero halted — feature branch on `origin` | ~ |
-| 4 | `ops/runbooks/day_24_runbook.md` | ~ |
-| 4b | `docs/architecture/day_24_review_report.md` + PR merged to `develop` | ~ |
-| 5 | State update, roadmap update, changelog, validation | ~ |
+| 1 | `docs/architecture/day_24_spec.md` | ✅ |
+| 2 | Commit log — 4/4 units committed, zero halted — feature branch on `origin` | ✅ |
+| 4 | `ops/runbooks/day_24_runbook.md` | ✅ |
+| 4b | `docs/architecture/day_24_review_report.md` + PR #30 squash-merged to `develop` | ✅ |
+| 5 | State update, roadmap update, changelog, validation | ✅ |
 
 ---
 
@@ -342,6 +342,7 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 | 21 | FastAPI Service Scaffold (M5.1) | Python 3.12 FastAPI scaffold, health endpoints, JWT auth, RFC 7807, multi-stage Dockerfile, docker-compose integration; 15 files, 393 additions; no .NET changes | PR #27 squash-merged to `develop` | ✅ |
 | 22 | LangChain RAG Pipeline + pgvector Read Integration (M5.2+M5.3) | asyncpg pool (fastapi_ro), cosine similarity search, KendoRAGChain, /v1/rag/query + /v1/rag/stream, RS256 JWKS validation, readiness wiring; 16 files, 647 additions; no .NET changes | PR #28 squash-merged to `develop` | ✅ |
 | 23 | Gateway → FastAPI RAG Routing (M5.4) | IFastAPIClient.RagQueryAsync/RagQueryStreamAsync, GET /api/rag/query + /api/rag/stream, 5 unit tests; 6 files, 506 additions; no Python changes | PR #29 squash-merged to `develop` | ✅ |
+| 24 | FastAPI Resilience Parity (M5.5) | pybreaker CB (pgvector + OpenAI), tenacity retry (DB + LLM, 4xx exclusion), OTel tracing (OTLP/console, trace_id, traceparent), 18 unit tests; 26 files, ~1130 additions; Python-only | PR #30 squash-merged to `develop` | ✅ |
 
 ---
 
@@ -378,7 +379,7 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 * **Docker Compose:** All 7 services with health checks; multi-replica (3 each) scaling for chaos testing
 * **Chaos Test Suite:** 3 xUnit tests (`Category=Chaos`) with Docker CLI integration. 3 bash scripts in `scripts/chaos/`. CI job `chaos-test` runs after `docker-compose`, invokes `run_all.sh` on multi-replica stack, uploads structured results artifact
 * **Tests:** 121/121 unit tests passing (no .NET changes; FastAPI Python RAG pipeline verified with integration tests)
-* **Runbooks:** Day 16 scenario playbooks + Day 17-23 day runbooks covering JWT auth, AI event contracts, Worker AI handlers, UserService Event Domain, FastAPI scaffold + RAG pipeline + Gateway routing
+* **Runbooks:** Day 16 scenario playbooks + Day 17-24 day runbooks covering JWT auth, AI event contracts, Worker AI handlers, UserService Event Domain, FastAPI scaffold + RAG pipeline + Gateway routing + resilience parity
 * **Branches:** `develop` (PR #28 squash-merged — Day 22: LangChain RAG Pipeline M5.2+M5.3) — on `origin`
 * **Pipelines:** CI pipeline active: build-and-test -> docker-compose -> chaos-test (known flakiness: test_db_downtime intermittent 000000)
 
@@ -386,10 +387,10 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 * **Database:** PostgreSQL 16 + pgvector (`pgvector/pgvector:pg16`), `kendo_users` DB, `vector` extension enabled via EF Core migration
 * **Messaging:** Rebus registered with Azure Service Bus transport — Gateway + UserService in producer mode (one-way client), Worker in consumer mode (polls `kendo-events`, 3 workers). Graceful skip when `Rebus__ConnectionString` is missing (local dev).
 * **Idempotency:** `IdempotencyRecords` table (WorkerDbContext) tracks message processing status (Processing/Completed/Failed). MessageId PK enforces uniqueness. Crash recovery re-processes messages left in Processing state. All handlers wrap DB ops in transactions.
-* **Branches:** `main` (scaffolding), `develop` (PR #29 squash-merged — Day 23: Gateway → FastAPI RAG Routing M5.4) — both on `origin`
+* **Branches:** `main` (scaffolding), `develop` (PR #30 squash-merged — Day 24: FastAPI Resilience Parity M5.5) — both on `origin`
 * **Pipelines:** CI pipeline active — build → unit tests → data integration tests (with pgvector + Redis service containers) → resilience tests → messaging tests → docker compose health verification → replica header verification → traffic distribution check. AI queue topology tests (graceful skip when ASB absent) run as part of messaging tests.
-* **Tests:** 126/126 unit tests passing (121 existing + Day 23 FastAPI integration/RAG routing tests)
-* **Observability:** All 3 services emit OpenTelemetry traces to console exporter; trace IDs correlated in all ILogger log lines; Polly callbacks emit structured logs with trace context; error responses include trace ID in RFC 7807 `traceId` field
+* **Tests:** 126/126 unit tests passing (no .NET changes; 18 new Python resilience tests added in Day 24)
+* **Observability:** All 3 .NET services emit OpenTelemetry traces to console exporter; FastAPI service also emits OpenTelemetry traces (OTLP or console exporter); trace IDs correlated in all log lines; RFC 7807 `trace_id` field populated from active OTel span in both .NET and FastAPI services; `traceparent` W3C propagation from Gateway through FastAPI
 * **Local:** API instances: 4 (Gateway, UserService, Worker, FastAPI), Postgres: 1 (Docker), RabbitMQ: 1 (infrastructure, not yet consumed), Redis: 1 (Docker, wired, best-effort cache)
 
 ---
@@ -431,3 +432,6 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 * **FastAPI JWT Auth — RS256 JWKS Validation:** `CachedJWKSClient` fetches Gateway JWKS on first request, caches for 1 hour, refreshes on unknown `kid`. Full RS256 validation of `exp`, `aud`, `iss`, `sub` claims. Specific RFC 7807 error responses for expired, wrong-audience, missing-kid. *(Day 22)*
 * **FastAPI RAG Pipeline — KendoRAGChain:** Embed-query→retrieve-contexts→build-answer pipeline. BGE-large-en-v1.5 for local dev, Azure OpenAI for cloud. Versioned prompt templates. Synchronous (`/v1/rag/query`) and SSE streaming (`/v1/rag/stream`) endpoints. *(Day 22)*
 * **Gateway → FastAPI RAG Proxy — IFastAPIClient:** `RagQueryAsync`/`RagQueryStreamAsync` methods on existing `IFastAPIClient` interface. Proxies `GET /api/rag/query` and `GET /api/rag/stream` from Gateway to FastAPI `POST /v1/rag/query` and `POST /v1/rag/stream`. Reuses existing Polly v8 pipeline (timeout 30s → retry 3 → circuit breaker 3 failures / 30s). No new DI registration or resilience config. *(Day 23)*
+* **FastAPI Resilience — pybreaker per dependency:** Independent `pybreaker.CircuitBreaker` instances for pgvector and Azure OpenAI (fail_max=3, reset_timeout=30s). State transitions logged via `CircuitBreakerListener`. Breakers wired in lifespan and stored in `app.state.resilience`. *(Day 24)*
+* **FastAPI Resilience — tenacity retry:** `retry_db()` and `retry_llm()` decorator factories with exponential backoff + jitter. DB retry on `asyncpg.exceptions.PostgresError`; LLM retry on `httpx` transient errors (5xx only — 4xx excluded via custom `_retry_if_llm_transient` predicate). *(Day 24)*
+* **FastAPI OpenTelemetry Tracing:** `init_tracing()` initializes TracerProvider with OTLP or console exporter. `get_current_trace_id()` populates `trace_id` in RFC 7807 responses. `TracePropagationMiddleware` extracts W3C `traceparent` from Gateway requests and creates child spans. *(Day 24)*
