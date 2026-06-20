@@ -1,0 +1,16 @@
+[project]
+name = "kendo-fastapi"
+version = "0.1.0"
+description = "Kendo AI/Vector Service — FastAPI + LangChain + pgvector"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "pydantic-settings[dotenv]>=2.7.0",
+]
+
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
