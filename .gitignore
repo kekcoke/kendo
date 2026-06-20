@@ -3,6 +3,14 @@
 *.env
 !.env.example
 
+# Chaos test results (generated artifacts)
+scripts/chaos/results/
+
+# Python build artifacts
+**/__pycache__/
+*.pyc
+*.pyo
+
 # .NET build artifacts
 bin/
 obj/
