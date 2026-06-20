@@ -1,17 +1,17 @@
 # Infraspekt — Current State
 > **Live checkpoint.** Updated by the Orchestrator at the end of every phase.  
 > Rule: never truncate history. Append only — except `## Last Session Summary` and `## Active Infrastructure Snapshot` (full replacements).  
-> Last updated: 2026-06-19 (Day 19)
+> Last updated: 2026-06-20 (Day 20)
 
 ---
 
 ## Session Variables
 
 ```yaml
-current_day: 20
-current_phase: 4        # Phase 4 — Delivery & Operations
+current_day: 21
+current_phase: 0        # Phase 0 ready for next session
 branch_base: develop
-feature_branch: feature/day-20-userservice-event-domain  # M0.6: UserService Event Domain + Admin Endpoint + pgvector Roles
+feature_branch: TBD  # resolved by next session Phase 1 {{SLUG}}
 phase_plan: "04"        # Pre-FastAPI Reconciliation
 ```
 
@@ -20,8 +20,8 @@ phase_plan: "04"        # Pre-FastAPI Reconciliation
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* **M0.5 complete** — Worker AI handlers + W7 summarization client implemented across 20 files, ~1,405 additions. 4 new Rebus handlers (EventIngested, EventValidated, UserEmbeddingUpdated, NotificationRequested), IFastAPISummarizationClient with independent Polly pipeline (15s timeout, own CB), NotificationDispatcherHostedService seam, and Day 19 runbook. All 7 commit units committed, zero halted. PR #24 squash-merged into `develop`.
-* **Phase 04, Part 3 complete** — 8/12 Phase 04 components now ✅ (added Worker AI Handlers, Worker FastAPI Client). Remaining: UserService Event Domain, Admin Endpoint, pgvector Roles (M0.6 — Day 20). Day 19 Phase 4b review report and Phase 5 state update completed in fix/day-19-missing-review-report.
+* **M0.6 complete** — UserService Event domain + embeddings foundation implemented across 18 files, ~1,328 additions. 4 new entities (Event, EventValidation, EventEmbedding, UserEmbedding), 3 migrations (AddEventDomain, AddFastAPIReadOnlyRole, AddEmbeddingAdminWriterRole), EventsController (5 routes), EmbeddingAdminController with admin:writes scope, scoped userservice_writer connection, and startup hook for kendo.embedding_dim GUC. All 9 commit units committed, zero halted. PR #26 squash-merged into `develop`.
+* **Phase 04 complete** — All 12/12 Phase 04 components now ✅ (Gateway JWT Auth, Gateway FastAPI Client, Gateway AI Controllers, Gateway Advisory Middleware, AI Event Contracts, AI Queue Topology, Worker AI Handlers, Worker FastAPI Client, UserService Event Domain, UserService Admin Endpoint, pgvector Roles). Phase 05 (FastAPI Service) is the next phase.
 * Carry-forward maintained: chaos-test CI flakiness (`test_db_downtime`) — still documented in M3.6 runbooks, not yet resolved. Day 17 open questions (IssuerSigningKeyResolver refactor, no user JWT issuance, no rotation BackgroundService) carried forward.
 
 ---
@@ -215,6 +215,21 @@ phase_plan: "04"        # Pre-FastAPI Reconciliation
 
 ---
 
+## Phase Outputs — Day 20
+> Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
+
+| Phase | Artifact | Status |
+|---|---|---|
+| 0 | State initialized, variables resolved → M0.6 UserService Event Domain | ✅ |
+| 0b | *Skipped* (repo has prior commits) | ✅ |
+| 1 | `docs/architecture/day_20_spec.md` (adopted, pre-authored) | ✅ |
+| 2 | Commit log — 9/9 units committed, zero halted — feature branch on `origin` | ✅ |
+| 4 | `ops/runbooks/day_20_runbook.md` · `docker-compose.yml` (embedding env vars) · `.env.example` | ✅ |
+| 4b | `docs/architecture/day_20_review_report.md` + PR #26 merged to `develop` | ✅ |
+| 5 | State update, roadmap update, changelog, validation | ✅ |
+
+---
+
 ## Phase Outputs — Day 19
 > Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
 
@@ -280,6 +295,7 @@ phase_plan: "04"        # Pre-FastAPI Reconciliation
 | 17 | Gateway JWT auth + FastAPI AI integration (M0.1+M0.2) | RsaKeyProvider, JwksEndpoint, AddKendoJwt, ServiceJwtMinter, AdminScopePolicies, IFastAPIClient, FastAPIClient (Polly timeout+retry+CB), RagController (W1/W2), UserSearchController (W3), AssistantController (W6), IntentAdvisoryMiddleware (W4); 22 files, 1363 additions; 22 new tests (119 total) | PR #22 merged to `develop` | ✅ |
 | 18 | AI Event Contracts + Queue Topology (M0.3+M0.4) | KendoTopology constants, 4 AI event types (EventIngested, EventValidated, UserEmbeddingUpdated, NotificationRequested), AddKendoRebusAiConsumer, AddKendoRebusAiProducer, dual-queue DlqDepthMonitor, Program.cs wiring across 3 services; 12 files, 471 additions; 119/119 tests passing | PR #23 squash-merged to `develop` | ✅ |
 | 19 | Worker AI Handlers + W7 Summarization (M0.5) | 4 new Rebus handlers (EventIngested, EventValidated, UserEmbeddingUpdated, NotificationRequested), IFastAPISummarizationClient with independent Polly (15s CB), NotificationDispatcherHostedService, service-JWT minter for Worker→UserService calls; 20 files, 1405 additions; 119/119 tests passing | PR #24 squash-merged to `develop` | ✅ |
+| 20 | UserService Event Domain + Embeddings Foundation (M0.6) | 4 new entities (Event, EventValidation, EventEmbedding, UserEmbedding), 3 migrations, EventsController (5 routes), EmbeddingAdminController with admin:writes scope, scoped userservice_writer connection, startup hook; 18 files, 1328 additions; 121/121 tests passing | PR #26 squash-merged to `develop` | ✅ |
 
 ---
 
@@ -301,6 +317,11 @@ phase_plan: "04"        # Pre-FastAPI Reconciliation
 | OutboxMessages | DB table | Transactional outbox table for atomic event publishing; filtered index for unprocessed messages, unique index on MessageId | Day 10 | UserService (UsersController, OutboxRelayService) |
 | AI Event Contracts | Messaging | 4 new KendoMessage types for AI workflows (EventIngestedEvent, EventValidatedEvent, UserEmbeddingUpdatedEvent, NotificationRequestedEvent) | Day 18 | Gateway (producer), UserService (producer), Worker (consumer + handlers) |
 | AI Queue Topology | Messaging | `kendo-events-ai` queue with dedicated producer/consumer registrations, TypeBased routing, DLQ monitoring | Day 18 | Worker (AddKendoRebusAiConsumer), Gateway (AddKendoRebusAiProducer), UserService (AddKendoRebusAiProducer) |
+| Events Table | DB table | `events` table with Event entity, FK to users, IngestionStatus tracking | Day 20 | UserService (EventsController), FastAPI (read-only, Phase 05) |
+| Event Embeddings Table | DB table | `event_embeddings` sidecar table with pgvector vector column for W1 ingestion | Day 20 | FastAPI (read-only, Phase 05), UserService (EmbeddingAdminController) |
+| User Embeddings Table | DB table | `user_embeddings` sidecar table with pgvector vector column for W3 semantic search | Day 20 | FastAPI (read-only, Phase 05), UserService (EmbeddingAdminController) |
+| fastapi_ro Role | DB Role | PostgreSQL read-only role for FastAPI service; SELECT-only grants on events and embeddings | Day 20 | FastAPI (Phase 05) |
+| userservice_writer Role | DB Role | PostgreSQL write role for EmbeddingAdminController; INSERT/UPDATE on embeddings | Day 20 | UserService (EmbeddingAdminController via scoped connection) |
 
 ---
 
@@ -310,18 +331,18 @@ phase_plan: "04"        # Pre-FastAPI Reconciliation
 * **Services:** Gateway (port 5000 behind NGINX), UserService (port 5001 expose), Worker (port 5002 expose), PostgreSQL (port 5432), Redis (port 6379), NGINX (port 80 internal, 5000 host) — all containerized
 * **Docker Compose:** All 6 services with health checks; multi-replica (3 each) scaling for chaos testing
 * **Chaos Test Suite:** 3 xUnit tests (`Category=Chaos`) with Docker CLI integration. 3 bash scripts in `scripts/chaos/`. CI job `chaos-test` runs after `docker-compose`, invokes `run_all.sh` on multi-replica stack, uploads structured results artifact
-* **Tests:** 119/119 unit tests passing (97 existing + 22 Day 17 JWT/FastAPI tests + Day 19 FastAPISummarizationClient tests)
-* **Runbooks:** Day 16 scenario playbooks (`db-failover.md`, `service-crash-recovery.md`, `dlq-drain.md`, `horizontal-scaling.md`) + central index (`day_16_runbook.md`) + Day 17 runbook (`day_17_runbook.md`) + Day 18 runbook (`day_18_runbook.md`) + Day 19 runbook (`day_19_runbook.md`) covering Worker AI handler operations
-* **Branches:** `develop` (PR #24 squash-merged — Day 19: Worker AI handlers + W7 summarization) — on `origin`
+* **Tests:** 121/121 unit tests passing (119 existing + Day 20 entity/DbContext/controller tests)
+* **Runbooks:** Day 16 scenario playbooks + Day 17-20 day runbooks covering JWT auth, AI event contracts, Worker AI handlers, and UserService Event Domain operations
+* **Branches:** `develop` (PR #26 squash-merged — Day 20: UserService Event Domain + Embeddings) — on `origin`
 * **Pipelines:** CI pipeline active: build-and-test -> docker-compose -> chaos-test (known flakiness: test_db_downtime intermittent 000000)
 
 * **Docker Compose:** All 6 services with health checks; PostgreSQL (5s interval), app services (10s interval), Redis (5s interval), NGINX (10s interval, wget self-health); `depends_on` postgres healthy → userservice
 * **Database:** PostgreSQL 16 + pgvector (`pgvector/pgvector:pg16`), `kendo_users` DB, `vector` extension enabled via EF Core migration
 * **Messaging:** Rebus registered with Azure Service Bus transport — Gateway + UserService in producer mode (one-way client), Worker in consumer mode (polls `kendo-events`, 3 workers). Graceful skip when `Rebus__ConnectionString` is missing (local dev).
 * **Idempotency:** `IdempotencyRecords` table (WorkerDbContext) tracks message processing status (Processing/Completed/Failed). MessageId PK enforces uniqueness. Crash recovery re-processes messages left in Processing state. All handlers wrap DB ops in transactions.
-* **Branches:** `main` (scaffolding), `develop` (PR #24 squash-merged — Day 19: Worker AI Handlers) — both on `origin`
+* **Branches:** `main` (scaffolding), `develop` (PR #26 squash-merged — Day 20: UserService Event Domain) — both on `origin`
 * **Pipelines:** CI pipeline active — build → unit tests → data integration tests (with pgvector + Redis service containers) → resilience tests → messaging tests → docker compose health verification → replica header verification → traffic distribution check. AI queue topology tests (graceful skip when ASB absent) run as part of messaging tests.
-* **Tests:** 119/119 unit tests passing (97 existing + 22 Day 17 Gateway JWT + FastAPI client tests + Day 19 FastAPISummarizationClient tests)
+* **Tests:** 121/121 unit tests passing (119 existing + Day 20 entity/DbContext/controller tests)
 * **Observability:** All 3 services emit OpenTelemetry traces to console exporter; trace IDs correlated in all ILogger log lines; Polly callbacks emit structured logs with trace context; error responses include trace ID in RFC 7807 `traceId` field
 * **Local:** API instances: 3 (Gateway, UserService, Worker), Postgres: 1 (Docker), RabbitMQ: 1 (infrastructure, not yet consumed), Redis: 1 (Docker, wired, best-effort cache)
 
@@ -357,3 +378,5 @@ phase_plan: "04"        # Pre-FastAPI Reconciliation
 * **Load Shedding — Concurrency Limiter (Gateway):** `ConcurrencyLimiter` registered as singleton in DI. `LoadSheddingMiddleware` returns 503 RFC 7807 under extreme concurrency. Runs before rate limiter in middleware pipeline. Health endpoints bypassed. *(Day 14)*
 * **Graceful Shutdown — SIGTERM + Drain (All Services):** `Kendo.Shared.GracefulShutdown` module with `RequestTracker` (thread-safe in-flight counter), `GracefulShutdownMiddleware` (blocks new requests during drain with 503 RFC 7807, health endpoints bypassed), and `GracefulShutdownHostedService` (triggers drain on `StopAsync()` and waits for completion). Configurable via `GracefulShutdown__TimeoutSeconds` (default 30s). ASP.NET Core `HostOptions.ShutdownTimeout` wired via `AddKendoGracefulShutdown()`. *(Day 15)*
 * **Worker FastAPI Summarization Client — Independent Polly Pipeline:** The Worker's `FastAPISummarizationClient` uses its own Polly pipeline (15s timeout, 3-failure → 30s circuit breaker) independent from the Gateway's `IFastAPIClient`. This ensures W7 (summarization) cannot starve W1/W2 (ingest/validate) of circuit breaker capacity. *(Day 19)*
+* **UserService Event Domain — Sidecar Embeddings + pgvector Hybrid:** Event, EventValidation, EventEmbedding, and UserEmbedding entities stored as sidecar tables (not columns on existing tables) to keep existing schemas immutable. Embedding columns use pgvector `vector` type via raw SQL ALTER in migration. Environment-driven dimension enforcement via `kendo.embedding_dim` GUC set on startup. *(Day 20)*
+* **Admin Scope — service-JWT-only enforcement:** `admin:writes` authorization policy enforces both `scope: admin:writes` AND `token_use: service` claims, preventing user JWTs from accessing admin endpoints. Defense-in-depth: JWT scope check + separate `userservice_writer` PostgreSQL role with scoped connection. *(Day 20)*

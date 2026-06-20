@@ -166,9 +166,9 @@
 | `AI Queue Topology` | `kendo-events-ai` queue, producers, consumers, DLQ | ✅ |
 | `Worker AI Handlers` | 4 new Rebus message handlers, dispatcher service | ✅ |
 | `Worker FastAPI Client` | `IFastAPISummarizationClient` for W7 streaming | ✅ |
-| `UserService Event Domain` | `Event`, `EventValidation`, `UserEmbedding` entities | ~ |
-| `UserService Admin Endpoint` | `EmbeddingAdminController` protected by `admin:writes` scope | ~ |
-| `pgvector Roles` | `fastapi_ro` and `userservice_writer` roles provisioned | ~ |
+| `UserService Event Domain` | `Event`, `EventValidation`, `UserEmbedding` entities | ✅ |
+| `UserService Admin Endpoint` | `EmbeddingAdminController` protected by `admin:writes` scope | ✅ |
+| `pgvector Roles` | `fastapi_ro` and `userservice_writer` roles provisioned | ✅ |
 | *(All Phase 01 + 02 + 03 components)* | Inherited and still passing all prior acceptance criteria | ✅ (inherited) |
 
 ---
