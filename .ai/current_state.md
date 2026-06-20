@@ -9,9 +9,9 @@
 
 ```yaml
 current_day: 20
-current_phase: 2        # Phase 2 — Implementation + Validation
+current_phase: 0        # Phase 0 ready for next session
 branch_base: develop
-feature_branch: feature/day-20-userservice-event-domain  # M0.6
+feature_branch: TBD  # resolved by Phase 1 {{SLUG}}
 phase_plan: "04"        # Pre-FastAPI Reconciliation
 ```
 
