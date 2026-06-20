@@ -111,4 +111,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(validate_router)
 
+    # W3 — User Profile Semantic Search (M5.9)
+    from app.api.v1.user_search import router as user_search_router
+
+    app.include_router(user_search_router)
+
     return app
