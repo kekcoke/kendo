@@ -8,7 +8,7 @@
 ## Session Variables
 
 ```yaml
-current_day: 25
+current_day: 26
 current_phase: 0        # Phase 0 ready for next session
 branch_base: develop
 feature_branch: TBD  # resolved by next session Phase 1 {{SLUG}}
@@ -20,9 +20,9 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* **M5.5 complete** — FastAPI resilience parity delivered: `pybreaker` circuit breakers (pgvector + Azure OpenAI, independent), `tenacity` retry with exponential backoff + jitter (DB + LLM, 4xx exclusion), OpenTelemetry tracing (OTLP/console exporter, `trace_id` in RFC 7807, `traceparent` propagation), 18 unit tests. PR #30 squash-merged into `develop`.
-* **Phase 05 progressing** — M5.1 (scaffold) + M5.2 (RAG) + M5.3 (pgvector) + M5.4 (Gateway routing) + M5.5 (resilience parity) now ✅. 11 components complete. Next: M5.6 — Observability + chaos + runbook.
-* Carry-forward maintained: chaos-test CI flakiness (`test_db_downtime`) — still documented in M3.6 runbooks. Day 17 open questions (IssuerSigningKeyResolver refactor, no user JWT issuance, no rotation BackgroundService) carried forward.
+* **M5.6 complete** — FastAPI foundation sealed: token-bucket rate limiter per JWT subject (429 + Retry-After), 4-scenario chaos test suite (DB down, LLM down, crash, slow stream), consolidated `ops/runbooks/fastapi_service.md` incident playbook, CI pipeline integration (chaos-test job). PR #31 squash-merged into `develop`.
+* **Phase 05 foundation complete** — All M5.1–M5.6 milestones now ✅. 12/12 Phase 05 components delivered (scaffold, RAG, pgvector, Gateway routing, resilience parity, observability + chaos + runbook). Next: M5.7 — W1 Event Ingestion RAG (first P0 workload).
+* Carry-forward maintained: chaos-test CI flakiness (`test_db_downtime`) — documented in `ops/runbooks/fastapi_service.md` §Known CI Flakiness. Day 17 open questions (IssuerSigningKeyResolver refactor, no user JWT issuance, no rotation BackgroundService) carried forward.
 
 ---
 
@@ -286,6 +286,19 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 | 4b | `docs/architecture/day_24_review_report.md` + PR #30 squash-merged to `develop` | ✅ |
 | 5 | State update, roadmap update, changelog, validation | ✅ |
 
+## Phase Outputs — Day 25
+> Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
+
+| Phase | Artifact | Status |
+|---|---|---|
+| 0 | State initialized, variables resolved → M5.6 Observability + chaos + runbook | ✅ |
+| 0b | *Skipped* (repo has prior commits) | ✅ |
+| 1 | `docs/architecture/day_25_spec.md` (adopted from `fastapi_rag_service_spec.md`) | ✅ |
+| 2 | Commit log — 2/2 units committed, zero halted — feature branch on `origin` | ✅ |
+| 4 | `ops/runbooks/fastapi_service.md` · `.github/workflows/ci.yml` (FastAPI chaos-test job) | ✅ |
+| 4b | `docs/architecture/day_25_review_report.md` + PR #31 squash-merged to `develop` | ✅ |
+| 5 | State update, roadmap update, changelog, validation | ✅ |
+
 ---
 
 ## Incomplete Tasks
@@ -343,6 +356,7 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 | 22 | LangChain RAG Pipeline + pgvector Read Integration (M5.2+M5.3) | asyncpg pool (fastapi_ro), cosine similarity search, KendoRAGChain, /v1/rag/query + /v1/rag/stream, RS256 JWKS validation, readiness wiring; 16 files, 647 additions; no .NET changes | PR #28 squash-merged to `develop` | ✅ |
 | 23 | Gateway → FastAPI RAG Routing (M5.4) | IFastAPIClient.RagQueryAsync/RagQueryStreamAsync, GET /api/rag/query + /api/rag/stream, 5 unit tests; 6 files, 506 additions; no Python changes | PR #29 squash-merged to `develop` | ✅ |
 | 24 | FastAPI Resilience Parity (M5.5) | pybreaker CB (pgvector + OpenAI), tenacity retry (DB + LLM, 4xx exclusion), OTel tracing (OTLP/console, trace_id, traceparent), 18 unit tests; 26 files, ~1130 additions; Python-only | PR #30 squash-merged to `develop` | ✅ |
+| 25 | FastAPI Observability + Chaos + Runbook (M5.6) | Token-bucket rate limiter per JWT subject (429 + Retry-After), 4-scenario chaos test suite (DB down, LLM down, crash, slow stream), `ops/runbooks/fastapi_service.md` incident playbook, CI FastAPI chaos-test job; 23 files, 1179 additions; 11 rate-limit tests + 4 chaos test files | PR #31 squash-merged to `develop` | ✅ |
 
 ---
 
