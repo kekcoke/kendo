@@ -26,6 +26,8 @@ dependencies = [
     "opentelemetry-instrumentation-httpx>=0.51b0",
     "pytest>=9.0.0",
     "pytest-asyncio>=0.25.0",
+    "deepeval>=1.0.0",
+    "ragas>=0.2.0",
 ]
 
 [tool.pytest.ini_options]
