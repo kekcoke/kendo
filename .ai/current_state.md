@@ -1,17 +1,17 @@
 # Infraspekt — Current State
 > **Live checkpoint.** Updated by the Orchestrator at the end of every phase.  
 > Rule: never truncate history. Append only — except `## Last Session Summary` and `## Active Infrastructure Snapshot` (full replacements).  
-> Last updated: 2026-06-19 (Day 21)
+> Last updated: 2026-06-19 (Day 22)
 
 ---
 
 ## Session Variables
 
 ```yaml
-current_day: 22
-current_phase: 1        # Phase 1 complete — day_22_spec.md created
+current_day: 23
+current_phase: 0        # Phase 0 ready for next session
 branch_base: develop
-feature_branch: TBD  # resolved by Phase 1 {{SLUG}}
+feature_branch: TBD  # resolved by next session Phase 1 {{SLUG}}
 phase_plan: "05"        # AI/Vector Service (FastAPI)
 ```
 
@@ -20,8 +20,8 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* **M5.1 complete** — FastAPI Service Scaffold (Python 3.12 + FastAPI + Uvicorn) implemented across 15 files, ~393 additions. Service containerized with multi-stage Dockerfile, health endpoints (/health/live, /health/ready), JWT auth middleware (RS256, health exempt), and RFC 7807 exception handler. All 4 commit units committed, zero halted. docker-compose integration: internal port 8000, depends_on postgres, HEALTHCHECK. CI updated to 7-service health check. PR #27 squash-merged into `develop`.
-* **Phase 05 foundation started** — M5.1 scaffold complete. 3 components now ✅ (FastAPIService Python, FastAPI Dockerfile, docker-compose integration, RFC 7807 handler, day runbook). Next: M5.2 — LangChain RAG pipeline.
+* **M5.2+M5.3 complete** — LangChain RAG pipeline and pgvector read integration implemented across 16 files, ~647 additions. pgvector asyncpg pool (fastapi_ro role), cosine similarity search, KendoRAGChain (embed→retrieve→answer), /v1/rag/query (sync) + /v1/rag/stream (SSE), real RS256 JWKS validation, readiness probe wired to pgvector. 5/5 commit units, zero halted. PR #28 squash-merged into `develop`.
+* **Phase 05 progressing** — M5.1 (scaffold) + M5.2 (RAG) + M5.3 (pgvector) now ✅. 6 components complete (FastAPIService, RAG Pipeline, pgvector Role, RFC 7807, Dockerfile, compose, Runbook). Next: M5.4 — Gateway → FastAPI client integration.
 * Carry-forward maintained: chaos-test CI flakiness (`test_db_downtime`) — still documented in M3.6 runbooks. Day 17 open questions (IssuerSigningKeyResolver refactor, no user JWT issuance, no rotation BackgroundService) carried forward.
 
 ---
@@ -245,18 +245,18 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 
 ---
 
-## Phase Outputs — Day 21
+## Phase Outputs — Day 22
 > Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
 
 | Phase | Artifact | Status |
 |---|---|---|
-| 0 | State initialized, variables resolved → M5.1 FastAPI Service Scaffold | ✅ |
+| 0 | State initialized, variables resolved → M5.2+M5.3 LangChain RAG + pgvector | ✅ |
 | 0b | *Skipped* (repo has prior commits) | ✅ |
-| 1 | `docs/architecture/day_21_spec.md` (adopted pre-authored `fastapi_rag_service_spec.md`) | ✅ |
-| 2 | Commit log — 4/4 units committed, zero halted — feature branch on `origin` | ✅ |
-| 4 | `ops/runbooks/day_21_runbook.md` · `docker-compose.yml` (fastapi service) · `.env.example` · CI health count bump | ✅ |
-| 4b | PR #27 squash-merged to `develop` | ✅ |
-| 5 | State update, roadmap update, changelog, validation | ✅ |
+| 1 | `docs/architecture/day_22_spec.md` (adopted pre-authored `fastapi_rag_service_spec.md`) | ✅ |
+| 2 | Commit log — 5/5 units committed, zero halted — feature branch on `origin` | ✅ |
+| 4 | `ops/runbooks/day_22_runbook.md` · `.env.example` (pgvector/LLM vars) · `pyproject.toml` (deps) | ✅ |
+| 4b | `docs/architecture/day_22_review_report.md` + PR #28 squash-merged to `develop` | ✅ |
+| 5 | State update, roadmap update, changelog, validation | ⏳ |
 
 ---
 
@@ -312,6 +312,7 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 | 19 | Worker AI Handlers + W7 Summarization (M0.5) | 4 new Rebus handlers (EventIngested, EventValidated, UserEmbeddingUpdated, NotificationRequested), IFastAPISummarizationClient with independent Polly (15s CB), NotificationDispatcherHostedService, service-JWT minter for Worker→UserService calls; 20 files, 1405 additions; 119/119 tests passing | PR #24 squash-merged to `develop` | ✅ |
 | 20 | UserService Event Domain + Embeddings Foundation (M0.6) | 4 new entities (Event, EventValidation, EventEmbedding, UserEmbedding), 3 migrations, EventsController (5 routes), EmbeddingAdminController with admin:writes scope, scoped userservice_writer connection, startup hook; 18 files, 1328 additions; 121/121 tests passing | PR #26 squash-merged to `develop` | ✅ |
 | 21 | FastAPI Service Scaffold (M5.1) | Python 3.12 FastAPI scaffold, health endpoints, JWT auth, RFC 7807, multi-stage Dockerfile, docker-compose integration; 15 files, 393 additions; no .NET changes | PR #27 squash-merged to `develop` | ✅ |
+| 22 | LangChain RAG Pipeline + pgvector Read Integration (M5.2+M5.3) | asyncpg pool (fastapi_ro), cosine similarity search, KendoRAGChain, /v1/rag/query + /v1/rag/stream, RS256 JWKS validation, readiness wiring; 16 files, 647 additions; no .NET changes | PR #28 squash-merged to `develop` | ✅ |
 
 ---
 
@@ -347,16 +348,16 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 * **Services:** Gateway (port 5000 behind NGINX), UserService (port 5001 expose), Worker (port 5002 expose), FastAPI (port 8000 internal), PostgreSQL (port 5432), Redis (port 6379), NGINX (port 80 internal, 5000 host) — all containerized
 * **Docker Compose:** All 7 services with health checks; multi-replica (3 each) scaling for chaos testing
 * **Chaos Test Suite:** 3 xUnit tests (`Category=Chaos`) with Docker CLI integration. 3 bash scripts in `scripts/chaos/`. CI job `chaos-test` runs after `docker-compose`, invokes `run_all.sh` on multi-replica stack, uploads structured results artifact
-* **Tests:** 121/121 unit tests passing (no .NET changes this day; FastAPI Python scaffold verified with integration tests)
-* **Runbooks:** Day 16 scenario playbooks + Day 17-21 day runbooks covering JWT auth, AI event contracts, Worker AI handlers, UserService Event Domain, and FastAPI scaffold operations
-* **Branches:** `develop` (PR #27 squash-merged — Day 21: FastAPI Service Scaffold M5.1) — on `origin`
+* **Tests:** 121/121 unit tests passing (no .NET changes; FastAPI Python RAG pipeline verified with integration tests)
+* **Runbooks:** Day 16 scenario playbooks + Day 17-22 day runbooks covering JWT auth, AI event contracts, Worker AI handlers, UserService Event Domain, FastAPI scaffold + RAG pipeline
+* **Branches:** `develop` (PR #28 squash-merged — Day 22: LangChain RAG Pipeline M5.2+M5.3) — on `origin`
 * **Pipelines:** CI pipeline active: build-and-test -> docker-compose -> chaos-test (known flakiness: test_db_downtime intermittent 000000)
 
 * **Docker Compose:** All 7 services with health checks; PostgreSQL (5s interval), app services (10s interval), Redis (5s interval), NGINX (10s interval, wget self-health), FastAPI (10s interval, curl health/live); `depends_on` postgres healthy → userservice; fastapi depends_on postgres
 * **Database:** PostgreSQL 16 + pgvector (`pgvector/pgvector:pg16`), `kendo_users` DB, `vector` extension enabled via EF Core migration
 * **Messaging:** Rebus registered with Azure Service Bus transport — Gateway + UserService in producer mode (one-way client), Worker in consumer mode (polls `kendo-events`, 3 workers). Graceful skip when `Rebus__ConnectionString` is missing (local dev).
 * **Idempotency:** `IdempotencyRecords` table (WorkerDbContext) tracks message processing status (Processing/Completed/Failed). MessageId PK enforces uniqueness. Crash recovery re-processes messages left in Processing state. All handlers wrap DB ops in transactions.
-* **Branches:** `main` (scaffolding), `develop` (PR #27 squash-merged — Day 21: FastAPI Service Scaffold M5.1) — both on `origin`
+* **Branches:** `main` (scaffolding), `develop` (PR #28 squash-merged — Day 22: FastAPI RAG Pipeline M5.2+M5.3) — both on `origin`
 * **Pipelines:** CI pipeline active — build → unit tests → data integration tests (with pgvector + Redis service containers) → resilience tests → messaging tests → docker compose health verification → replica header verification → traffic distribution check. AI queue topology tests (graceful skip when ASB absent) run as part of messaging tests.
 * **Tests:** 121/121 unit tests passing (119 existing + Day 20 entity/DbContext/controller tests)
 * **Observability:** All 3 services emit OpenTelemetry traces to console exporter; trace IDs correlated in all ILogger log lines; Polly callbacks emit structured logs with trace context; error responses include trace ID in RFC 7807 `traceId` field
@@ -397,3 +398,6 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 * **UserService Event Domain — Sidecar Embeddings + pgvector Hybrid:** Event, EventValidation, EventEmbedding, and UserEmbedding entities stored as sidecar tables (not columns on existing tables) to keep existing schemas immutable. Embedding columns use pgvector `vector` type via raw SQL ALTER in migration. Environment-driven dimension enforcement via `kendo.embedding_dim` GUC set on startup. *(Day 20)*
 * **Admin Scope — service-JWT-only enforcement:** `admin:writes` authorization policy enforces both `scope: admin:writes` AND `token_use: service` claims, preventing user JWTs from accessing admin endpoints. Defense-in-depth: JWT scope check + separate `userservice_writer` PostgreSQL role with scoped connection. *(Day 20)*
 * **FastAPI Service — Python 3.12 + FastAPI:** First non-.NET workload in the platform. Uses `fastapi[standard]`, `pydantic-settings` for env-based config. App factory pattern (`create_app()`). JWT auth middleware (RS256, health endpoint exemption). RFC 7807 Problem Details exception handler matching .NET convention. Multi-stage Dockerfile with `python:3.12-slim`. Docker Compose integration: internal port 8000, health check, depends_on postgres. *(Day 21)*
+* **FastAPI pgvector Read — asyncpg + fastapi_ro:** asyncpg connection pool using the `fastapi_ro` PostgreSQL role (SELECT-only grants). Cosine similarity search via `embedding <=> $1` operator. Read-only enforced at the database level, not just code. *(Day 22)*
+* **FastAPI JWT Auth — RS256 JWKS Validation:** `CachedJWKSClient` fetches Gateway JWKS on first request, caches for 1 hour, refreshes on unknown `kid`. Full RS256 validation of `exp`, `aud`, `iss`, `sub` claims. Specific RFC 7807 error responses for expired, wrong-audience, missing-kid. *(Day 22)*
+* **FastAPI RAG Pipeline — KendoRAGChain:** Embed-query→retrieve-contexts→build-answer pipeline. BGE-large-en-v1.5 for local dev, Azure OpenAI for cloud. Versioned prompt templates. Synchronous (`/v1/rag/query`) and SSE streaming (`/v1/rag/stream`) endpoints. *(Day 22)*
