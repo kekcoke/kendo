@@ -199,6 +199,45 @@ public class FastAPIClient : IFastAPIClient
         return result!;
     }
 
+    // M5.4 — Generic RAG query (sync)
+    public async Task<RagQueryResult> RagQueryAsync(
+        RagQueryRequest request, CancellationToken ct)
+    {
+        var response = await ExecuteWithPipelineAsync(
+            () => _http.PostAsJsonAsync("/v1/rag/query", request, JsonOptions, ct), ct);
+
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content
+            .ReadFromJsonAsync<RagQueryResult>(JsonOptions, ct);
+        return result!;
+    }
+
+    // M5.4 — Streaming RAG (SSE)
+    public async IAsyncEnumerable<RagStreamChunk> RagQueryStreamAsync(
+        RagQueryRequest request, [EnumeratorCancellation] CancellationToken ct)
+    {
+        var response = await ExecuteWithPipelineAsync(
+            () => _http.PostAsJsonAsync("/v1/rag/stream", request, JsonOptions, ct), ct);
+
+        response.EnsureSuccessStatusCode();
+
+        using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var reader = new StreamReader(stream);
+
+        while (!reader.EndOfStream && !ct.IsCancellationRequested)
+        {
+            var line = await reader.ReadLineAsync(ct);
+            if (string.IsNullOrEmpty(line)) continue;
+
+            var chunk = JsonSerializer.Deserialize<RagStreamChunk>(line, JsonOptions);
+            if (chunk != null)
+            {
+                yield return chunk;
+                if (chunk.IsDone) yield break;
+            }
+        }
+    }
+
     private async Task<HttpResponseMessage> ExecuteWithPipelineAsync(
         Func<Task<HttpResponseMessage>> action, CancellationToken ct)
     {
