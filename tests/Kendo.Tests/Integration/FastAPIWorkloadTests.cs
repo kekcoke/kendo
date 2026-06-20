@@ -213,4 +213,97 @@ public class FastAPIWorkloadTests
 
         Assert.Contains("Service Unavailable", ex.Message);
     }
+
+    // ========================================================================
+    // W3 — SearchUsersAsync
+    // ========================================================================
+
+    [Fact]
+    [Trait("Category", "FastAPIW3")]
+    public async Task SearchUsersAsync_ValidQuery_ReturnsResults()
+    {
+        // Arrange
+        var expected = new UserSearchResult(
+            UserIds: ["user-001", "user-002"],
+            Relevance: [0.92, 0.85]);
+
+        var handler = CreateMockHandler(HttpStatusCode.OK, expected);
+        var http = new HttpClient(handler.Object);
+        var client = new FastAPIClient(
+            http, CreateOptions(), new FastApiExceptionMapper(),
+            Mock.Of<ILogger<FastAPIClient>>());
+
+        // Act
+        var result = await client.SearchUsersAsync(
+            new UserSearchRequest("developer"), CancellationToken.None);
+
+        // Assert
+        Assert.Equal(2, result.UserIds.Length);
+        Assert.Equal("user-001", result.UserIds[0]);
+        Assert.Equal(0.92, result.Relevance[0]);
+    }
+
+    [Fact]
+    [Trait("Category", "FastAPIW3")]
+    public async Task SearchUsersAsync_FastApi503_AfterRetriesThrows()
+    {
+        // Arrange
+        var problemResponse = new
+        {
+            type = "about:blank",
+            title = "Service Unavailable",
+            status = 503,
+            detail = "search unavailable",
+            trace_id = "trace-503"
+        };
+
+        var json = JsonSerializer.Serialize(problemResponse, JsonOptions);
+        var mock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+        mock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .Returns(() => Task.FromResult(new HttpResponseMessage
+            {
+                StatusCode = HttpStatusCode.ServiceUnavailable,
+                Content = new StringContent(json)
+            }));
+
+        var httpClient = new HttpClient(mock.Object) { BaseAddress = new Uri("http://fastapi:8000") };
+        var client = new FastAPIClient(
+            httpClient, CreateOptions(), new FastApiExceptionMapper(),
+            Mock.Of<ILogger<FastAPIClient>>());
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<FastApiClientException>(() =>
+            client.SearchUsersAsync(
+                new UserSearchRequest("developer"), CancellationToken.None));
+
+        Assert.Contains("Service Unavailable", ex.Message);
+    }
+
+    [Fact]
+    [Trait("Category", "FastAPIW3")]
+    public async Task SearchUsersAsync_EmptyQuery_ReturnsResults()
+    {
+        // Arrange
+        var expected = new UserSearchResult(
+            UserIds: Array.Empty<string>(),
+            Relevance: Array.Empty<double>());
+
+        var handler = CreateMockHandler(HttpStatusCode.OK, expected);
+        var http = new HttpClient(handler.Object);
+        var client = new FastAPIClient(
+            http, CreateOptions(), new FastApiExceptionMapper(),
+            Mock.Of<ILogger<FastAPIClient>>());
+
+        // Act
+        var result = await client.SearchUsersAsync(
+            new UserSearchRequest("zzz_unknown"), CancellationToken.None);
+
+        // Assert
+        Assert.Empty(result.UserIds);
+        Assert.Empty(result.Relevance);
+    }
 }
