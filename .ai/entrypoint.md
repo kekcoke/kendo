@@ -129,14 +129,21 @@ Read the Phase {{phase_plan}} section of @docs/platform_roadmap.md.
 Adopt the Orchestrator persona. Derive this session's milestone from the
 first ~ row in the ### Components table for Phase {{phase_plan}}.
 
-CRITICAL: Check the `docs/architecture/` folder. Does a spec file already 
-exist for this specific milestone or component (e.g., day_{{DAY_NUMBER}}_spec.md 
-or a named spec like fastapi_rag_service_spec.md)? 
+CRITICAL: Determine the spec authority for this session's milestone:
 
-- If YES: Your Session Plan must instruct the Phase 1 Architect to READ and ADOPT 
-  the existing spec, strictly preserving its data contracts and implementation plan, 
-  rather than generating a new one from scratch.
-- If NO: Proceed with standard Phase 1 generation.
+  Case A — A pre-authored day spec exists (e.g., `day_{{DAY_NUMBER}}_spec.md`):  
+  Phase 1 Architect MUST READ and ADOPT it verbatim — preserve data contracts, 
+  implementation plan, and commit units exactly as authored.
+
+  Case B — `docs/architecture/fastapi_rag_service_spec.md` defines workload-level 
+  data contracts for this milestone (e.g., §W1, §W2, §W5):  
+  Phase 1 Architect MUST ADOPT BY REFERENCE — the generated spec cites the design 
+  spec section + revision date in `## Data Contracts` and `## Success Checklist`, 
+  then defines only commit units, file paths, gate commands, and integration 
+  points as fresh content unique to this day.
+
+  Case C — No pre-authored spec and no design-spec contract covers this milestone:  
+  Proceed with standard Phase 1 generation from scratch.
 
 Output your Session Plan — including the resolved {{MILESTONE}} and
 {{MILESTONE_TITLE}} — and await my confirmation before executing Phase 0.
@@ -202,4 +209,26 @@ Before doing anything else:
    The milestone remains {{MILESTONE}} — {{MILESTONE_TITLE}}.
 
 Await my confirmation that blockers are understood before executing Phase 1.
+```
+
+### Prompt 6 — Remediation Day (Carry-Forward Resolution)
+> Use when a session resolves carry-forward items instead of deriving scope from roadmap milestones. Common for tech-debt cleanup, CI flakiness fixes, and refactoring days.
+
+```text
+Read @.ai/entrypoint.md, @.ai/orchestration.md, and @.ai/current_state.md.
+
+You are the Kendo Orchestrator. This session does NOT derive scope from
+a roadmap milestone. Instead, it resolves one or more carry-forward items
+from `current_state.md`.
+
+Carry-forward item(s) in scope today:
+{{CF_ITEM_LIST}}
+
+Complete the standard Phase 0 → 1 → 2 → 4 → 4b → 5 cycle. Phase 1 produces
+a lightweight remediation spec with focused commit units — no new architectural
+contracts unless the resolution requires them. Validated by the same gate
+conditions as a standard delivery day (Phase 4b reviewer signs off).
+
+Output your Session Plan — including the resolved CF items and the expected
+success state — and await my confirmation before executing Phase 0.
 ```
