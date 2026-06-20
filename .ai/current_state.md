@@ -1,14 +1,14 @@
 # Infraspekt — Current State
 > **Live checkpoint.** Updated by the Orchestrator at the end of every phase.  
 > Rule: never truncate history. Append only — except `## Last Session Summary` and `## Active Infrastructure Snapshot` (full replacements).  
-> Last updated: 2026-06-19 (Day 23) — Phase 5 sealed
+> Last updated: 2026-06-20 (Day 26) — Phase 5 sealed
 
 ---
 
 ## Session Variables
 
 ```yaml
-current_day: 26
+current_day: 27
 current_phase: 0        # Phase 0 ready for next session
 branch_base: develop
 feature_branch: TBD  # resolved by next session Phase 1 {{SLUG}}
@@ -20,9 +20,9 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* **M5.6 complete** — FastAPI foundation sealed: token-bucket rate limiter per JWT subject (429 + Retry-After), 4-scenario chaos test suite (DB down, LLM down, crash, slow stream), consolidated `ops/runbooks/fastapi_service.md` incident playbook, CI pipeline integration (chaos-test job). PR #31 squash-merged into `develop`.
-* **Phase 05 foundation complete** — All M5.1–M5.6 milestones now ✅. 12/12 Phase 05 components delivered (scaffold, RAG, pgvector, Gateway routing, resilience parity, observability + chaos + runbook). Next: CF-2 — Gateway JWT Auth Refactor (Day 26), then CF-1 — Chaos Test CI Flakiness Fix (Day 27), then M5.7 — W1 Event Ingestion RAG (Day 28+).
-* Carry-forward maintained: chaos-test CI flakiness (`test_db_downtime`) — documented in `ops/runbooks/fastapi_service.md` §Known CI Flakiness. Day 17 open questions (IssuerSigningKeyResolver refactor, no user JWT issuance, no rotation BackgroundService) carried forward.
+* **CF-2 complete** — Gateway JWT Auth Refactor sealed: `IssuerSigningKeyResolver` closure-based DI (no more `BuildServiceProvider()`), `POST /api/auth/token` user JWT issuance endpoint, `KeyRotationBackgroundService` with two-key overlap (7d) and meta-file persistence. PR #33 squash-merged to `develop`.
+* **Phase 05 foundation complete** — All M5.1–M5.6 milestones now ✅. Next: Day 27 — CF-1 Chaos Test CI Flakiness Fix.
+* Carry-forward maintained: chaos-test CI flakiness (`test_db_downtime`) — remains unresolved until Day 27. CF-2 (Day 17 open questions: IssuerSigningKeyResolver, user JWT issuance, key rotation) **resolved and removed from carry-forward**.
 
 ---
 
@@ -322,7 +322,7 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 > Open blockers, homework, and unresolved decisions. Remove when resolved; append when new ones arise.
 
 - **chaos-test CI flakiness (Day 13/15/16):** `test_db_downtime` chaos test intermittently fails in CI returning `000000` (connection refused) instead of expected 503. **Fully documented in M3.6 runbooks** — see `ops/runbooks/db-failover.md` §Known CI Flakiness for symptom, suspected root cause, and 3 mitigation approaches. Not blocking CI (~90% pass rate). Carry-forward maintained for engineering action — recommended mitigation #2 (retry loop after `docker compose unpause`) should be applied to `scripts/chaos/test_db_downtime.sh`.
-- **Day 17 — open questions for closure refactoring:** `IssuerSigningKeyResolver` uses `BuildServiceProvider()` anti-pattern — needs closure-based refactor. User JWT issuance not implemented (validation only). Key rotation has no `BackgroundService` — manual only. Carried forward for Day 19+/clean-up sprint.
+- ~~**Day 17 — open questions for closure refactoring:** `IssuerSigningKeyResolver` uses `BuildServiceProvider()` anti-pattern — needs closure-based refactor. User JWT issuance not implemented (validation only). Key rotation has no `BackgroundService` — manual only. Carried forward for Day 19+/clean-up sprint.~~ **RESOLVED in Day 26 (CF-2).**
 
 ---
 
@@ -331,6 +331,7 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 | Day | Title | Key Outputs | Notes | Status |
 |---|---|---|---|---|
 | 00 | Repo Scaffolding | `.ai/` structure, GitHub Actions baseline | Phase 0b bootstrap committed | ✅ |
+| 26 | Gateway JWT Auth Refactor (CF-2) | `IssuerSigningKeyResolver` refactored (no BuildServiceProvider), `POST /api/auth/token` user JWT issuance, `KeyRotationBackgroundService` (90d rotation, 7d overlap window), JWKS multi-key support, `AdminToken` policy, runbook | PR #33 squash-merged to develop. JWT contract frozen before M5.7 workloads. CF-2 resolved. | ✅ |
 | 01 | Multi-service scaffold | Gateway + UserService + Worker, Docker Compose, CI pipeline, 8 tests | PR #2 merged to develop | ✅ |
 | 02 | Database layer | PostgreSQL 16 + pgvector, EF Core DbContext, initial migration, connection string externalized, 12 tests | PR #3 merged to develop | ✅ |
 | 03 | Resilience baseline | Polly Retry + Circuit Breaker on DB + HTTP clients, shared resilience pipeline, 25 tests (13 resilience), CI updated | PR #4 merged to develop | ✅ |
@@ -383,6 +384,9 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 | User Embeddings Table | DB table | `user_embeddings` sidecar table with pgvector vector column for W3 semantic search | Day 20 | FastAPI (read-only, Phase 05), UserService (EmbeddingAdminController) |
 | fastapi_ro Role | DB Role | PostgreSQL read-only role for FastAPI service; SELECT-only grants on events and embeddings | Day 20 | FastAPI (Phase 05) |
 | userservice_writer Role | DB Role | PostgreSQL write role for EmbeddingAdminController; INSERT/UPDATE on embeddings | Day 20 | UserService (EmbeddingAdminController via scoped connection) |
+| `/.well-known/jwks.json` (multi-key) | HTTP Endpoint | JWKS endpoint returns all valid public keys (current + previous within 7-day overlap window) | Day 26 | FastAPI, Worker, UserService (JWT validation) |
+| `POST /api/auth/token` | HTTP Endpoint | User JWT issuance endpoint for service-to-service token minting (AdminToken policy) | Day 26 | Worker, UserService (service-JWT callers) |
+| `KeyRotationBackgroundService` | BackgroundService | Automatic JWK rotation (90d default, 1h check interval, 3 retry persistence) | Day 26 | Gateway (internal) |
 
 ---
 
