@@ -1,17 +1,17 @@
 # Infraspekt — Current State
 > **Live checkpoint.** Updated by the Orchestrator at the end of every phase.  
 > Rule: never truncate history. Append only — except `## Last Session Summary` and `## Active Infrastructure Snapshot` (full replacements).  
-> Last updated: 2026-06-20 (Day 28) — Phase 5 sealed (conditional PASS)
+> Last updated: 2026-06-20 (Day 31) — Phase 5 sealed
 
 ---
 
 ## Session Variables
 
 ```yaml
-current_day: 28
+current_day: 32
 current_phase: 0        # Phase 0 ready for next session
 branch_base: develop
-feature_branch: feature/day-28-w1-event-ingestion  # conditional PASS — merge blocked on M5.14
+feature_branch: feature/day-31-w5-embeddings-backfill
 phase_plan: "05"        # AI/Vector Service (FastAPI)
 ```
 
@@ -20,9 +20,9 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* **Day 28 (M5.7) implemented** — W1 Event Ingestion RAG: `POST /v1/rag/ingest` on FastAPI, proxied via Gateway `POST /api/events/ingest`. 9 Python tests + 5 .NET integration tests all green. Conditional PASS — branch on `origin`, merge blocked on M5.14 (W8).
-* **Next: Day 29 — M5.14 (W8) Evaluation & Regression Gate.** Must ship to `develop` before W1 can merge. Case C spec (no pre-authored day spec).
-* **After: Day 30 — Rebase + merge W1** with W1 eval dataset wired into W8 suite.
+* **Day 31 (M5.11) implemented** — W5 Embeddings Backfill & Re-indexing: `python -m app.jobs.reindex` CLI with checkpoint/resume, `POST /internal/embeddings/batch` on UserService, apscheduler daily 02:00 UTC cron, 26 new tests all green. PR #38 merged to `develop`.
+* **P0 workloads delivered in prior sessions:** W1 (M5.7), W2 (M5.8), W8 (M5.14) all live in `develop`. Roadmap component status updated to reflect actual state.
+* **Next: Day 32 — M5.9 (W3) User Profile Semantic Search.** First workload that reads from the embeddings populated by W5.
 
 ---
 
@@ -322,8 +322,6 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 > Open blockers, homework, and unresolved decisions. Remove when resolved; append when new ones arise.
 
 - *(none — all carry-forwards resolved)*
-- **CF-28.1:** W1 branch (`feature/day-28-w1-event-ingestion`) on `origin` awaiting M5.14 merge before rebase+merge to `develop`
-- **CF-28.2:** W1 eval dataset (to be wired into W8 suite on merge day — Day 30)
 
 ---
 
@@ -360,7 +358,10 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 | 23 | Gateway → FastAPI RAG Routing (M5.4) | IFastAPIClient.RagQueryAsync/RagQueryStreamAsync, GET /api/rag/query + /api/rag/stream, 5 unit tests; 6 files, 506 additions; no Python changes | PR #29 squash-merged to `develop` | ✅ |
 | 24 | FastAPI Resilience Parity (M5.5) | pybreaker CB (pgvector + OpenAI), tenacity retry (DB + LLM, 4xx exclusion), OTel tracing (OTLP/console, trace_id, traceparent), 18 unit tests; 26 files, ~1130 additions; Python-only | PR #30 squash-merged to `develop` | ✅ |
 | 25 | FastAPI Observability + Chaos + Runbook (M5.6) | Token-bucket rate limiter per JWT subject (429 + Retry-After), 4-scenario chaos test suite (DB down, LLM down, crash, slow stream), `ops/runbooks/fastapi_service.md` incident playbook, CI FastAPI chaos-test job; 23 files, 1179 additions; 11 rate-limit tests + 4 chaos test files | PR #31 squash-merged to `develop` | ✅ |
-| 28 | W1 Event Ingestion RAG (M5.7) | FastAPI `POST /v1/rag/ingest`, Gateway `POST /api/events/ingest`, IngestChain with chunk→embed→retrieve→LLM pipeline, 9 Python tests, 5 .NET W1 integration tests, Day 28 runbook | Conditional PASS — branch `feature/day-28-w1-event-ingestion` on `origin`, merge blocked on M5.14 per P0 ordering rule | ⏳ (conditional) |
+| 28 | W1 Event Ingestion RAG (M5.7) | FastAPI `POST /v1/rag/ingest`, Gateway `POST /api/events/ingest`, IngestChain with chunk→embed→retrieve→LLM pipeline, 9 Python tests, 5 .NET W1 integration tests, Day 28 runbook | Merged PR #36 — unblocked by W8 (PR #35) + W2 (PR #37) | ✅ |
+| 29 | W8 Evaluation & Regression Gate (M5.14) | pytest + DeepEval + Ragas framework, CI eval-gate job, w1_eval_dataset.json, baseline script; 2 eval test files | Merged PR #35 to develop | ✅ |
+| 30 | W2 Event Conflict & Schedule Reasoning (M5.8) | `POST /v1/rag/validate`, ValidateChain with multi-step reasoning, Gateway proxy, 6 Python tests, runbook; W1 rebased + merged w/ eval dataset | Merged PR #37, spec restored from git history | ✅ |
+| 31 | W5 Embeddings Backfill & Re-indexing (M5.11) | `python -m app.jobs.reindex` CLI, `POST /internal/embeddings/batch` on UserService, UserServiceClient with retry+CB, apscheduler daily cron, checkpoint/resume, 26 new tests, runbook | PR #38 squash-merged to develop | ✅ |
 
 ---
 
