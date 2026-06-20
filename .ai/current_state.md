@@ -1,14 +1,14 @@
 # Infraspekt — Current State
 > **Live checkpoint.** Updated by the Orchestrator at the end of every phase.  
 > Rule: never truncate history. Append only — except `## Last Session Summary` and `## Active Infrastructure Snapshot` (full replacements).  
-> Last updated: 2026-06-20 (Day 26) — Phase 5 sealed
+> Last updated: 2026-06-20 (Day 27) — Phase 5 sealed
 
 ---
 
 ## Session Variables
 
 ```yaml
-current_day: 27
+current_day: 28
 current_phase: 0        # Phase 0 ready for next session
 branch_base: develop
 feature_branch: TBD  # resolved by next session Phase 1 {{SLUG}}
@@ -20,9 +20,9 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* **CF-2 complete** — Gateway JWT Auth Refactor sealed: `IssuerSigningKeyResolver` closure-based DI (no more `BuildServiceProvider()`), `POST /api/auth/token` user JWT issuance endpoint, `KeyRotationBackgroundService` with two-key overlap (7d) and meta-file persistence. PR #33 squash-merged to `develop`.
-* **Phase 05 foundation complete** — All M5.1–M5.6 milestones now ✅. Next: Day 27 — CF-1 Chaos Test CI Flakiness Fix.
-* Carry-forward maintained: chaos-test CI flakiness (`test_db_downtime`) — remains unresolved until Day 27. CF-2 (Day 17 open questions: IssuerSigningKeyResolver, user JWT issuance, key rotation) **resolved and removed from carry-forward**.
+* **CF-1 complete** — chaos-test CI flakiness (`test_db_downtime`) resolved: pg_isready retry loop added after `docker compose unpause` to eliminate race condition. PR #34 squash-merged to `develop`. Both CF-1 and CF-2 carry-forwards now resolved.
+* **All carry-forwards cleared.** All Day 17 open questions resolved (user JWT issuance, key rotation, IssuerSigningKeyResolver refactor). Chaos-test flakiness fixed.
+* **Next: M5.7 — W1 Event Ingestion RAG (first P0 workload).** JWKS contract frozen, CI stable.
 
 ---
 
@@ -321,8 +321,7 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 ## Carry-Forward Items
 > Open blockers, homework, and unresolved decisions. Remove when resolved; append when new ones arise.
 
-- **chaos-test CI flakiness (Day 13/15/16):** `test_db_downtime` chaos test intermittently fails in CI returning `000000` (connection refused) instead of expected 503. **Fully documented in M3.6 runbooks** — see `ops/runbooks/db-failover.md` §Known CI Flakiness for symptom, suspected root cause, and 3 mitigation approaches. Not blocking CI (~90% pass rate). Carry-forward maintained for engineering action — recommended mitigation #2 (retry loop after `docker compose unpause`) should be applied to `scripts/chaos/test_db_downtime.sh`.
-- ~~**Day 17 — open questions for closure refactoring:** `IssuerSigningKeyResolver` uses `BuildServiceProvider()` anti-pattern — needs closure-based refactor. User JWT issuance not implemented (validation only). Key rotation has no `BackgroundService` — manual only. Carried forward for Day 19+/clean-up sprint.~~ **RESOLVED in Day 26 (CF-2).**
+- *(none — all carry-forwards from Days 13-17 resolved)*
 
 ---
 
@@ -332,6 +331,7 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 |---|---|---|---|---|
 | 00 | Repo Scaffolding | `.ai/` structure, GitHub Actions baseline | Phase 0b bootstrap committed | ✅ |
 | 26 | Gateway JWT Auth Refactor (CF-2) | `IssuerSigningKeyResolver` refactored (no BuildServiceProvider), `POST /api/auth/token` user JWT issuance, `KeyRotationBackgroundService` (90d rotation, 7d overlap window), JWKS multi-key support, `AdminToken` policy, runbook | PR #33 squash-merged to develop. JWT contract frozen before M5.7 workloads. CF-2 resolved. | ✅ |
+| 27 | Chaos Test CI Flakiness Fix (CF-1) | pg_isready retry loop after `docker compose unpause` in `test_db_downtime.sh`; runbook. No application code changes. | PR #34 squash-merged to develop. CF-1 resolved. All carry-forwards cleared. | ✅ |
 | 01 | Multi-service scaffold | Gateway + UserService + Worker, Docker Compose, CI pipeline, 8 tests | PR #2 merged to develop | ✅ |
 | 02 | Database layer | PostgreSQL 16 + pgvector, EF Core DbContext, initial migration, connection string externalized, 12 tests | PR #3 merged to develop | ✅ |
 | 03 | Resilience baseline | Polly Retry + Circuit Breaker on DB + HTTP clients, shared resilience pipeline, 25 tests (13 resilience), CI updated | PR #4 merged to develop | ✅ |
