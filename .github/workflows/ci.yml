@@ -178,6 +178,19 @@ jobs:
           chmod +x scripts/chaos/*.sh
           scripts/chaos/run_all.sh
 
+      - name: Run FastAPI chaos tests (python)
+        if: always()
+        working-directory: src/FastAPIService
+        run: |
+          .venv/bin/python -m pytest tests/chaos/ -v --chaos --junitxml=chaos-report.xml
+
+      - name: Upload FastAPI chaos test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastapi-chaos-test-results
+          path: src/FastAPIService/chaos-report.xml
+
       - name: Upload chaos test results
         if: always()
         uses: actions/upload-artifact@v4

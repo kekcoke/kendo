@@ -68,9 +68,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
 
     # --- Middleware ---
-    # Registered in order: auth -> trace propagation -> problem details
+    # Registered in order: auth -> rate limit -> trace propagation -> problem details
     # Auth middleware: health endpoints are exempted via EXEMPT_PATHS
     from app.middleware.auth import JWTAuthMiddleware
+    from app.middleware.rate_limit import RateLimitMiddleware
     from app.middleware.trace_propagation import TracePropagationMiddleware
     from app.middleware.problem_details import add_problem_details_handler
 
@@ -79,6 +80,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         jwks_url=settings.jwt_jwks_url,
         audience=settings.jwt_audience,
         issuer=settings.jwt_issuer,
+    )
+    app.add_middleware(
+        RateLimitMiddleware,
+        tokens_per_window=settings.rate_limit_tokens_per_window,
+        window_seconds=settings.rate_limit_window_seconds,
+        bucket_capacity=settings.rate_limit_bucket_capacity,
     )
     app.add_middleware(TracePropagationMiddleware)
     add_problem_details_handler(app)

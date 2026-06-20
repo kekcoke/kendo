@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     retry_max_wait: float = 30.0
     retry_multiplier: float = 2.0
 
+    # --- Rate Limiting ---
+    rate_limit_tokens_per_window: int = 100
+    rate_limit_window_seconds: int = 60
+    rate_limit_bucket_capacity: int = 100
+
     # --- OpenTelemetry ---
     otel_service_name: str = "kendo-fastapi"
     otel_exporter_otlp_endpoint: str = ""  # empty = console exporter fallback
