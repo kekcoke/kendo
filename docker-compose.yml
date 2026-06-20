@@ -109,6 +109,31 @@ services:
       retries: 3
       start_period: 15s
 
+  fastapi:
+    build:
+      context: ./src/FastAPIService
+      dockerfile: Dockerfile
+    expose:
+      - "8000"
+    environment:
+      - FASTAPI__ENV=development
+      - FASTAPI__SERVICE_NAME=kendo-fastapi
+      - FASTAPI__JWT__JWKS_URL=http://gateway:5000/.well-known/jwks.json
+      - FASTAPI__JWT__AUDIENCE=kendo.api
+      - FASTAPI__JWT__ISSUER=https://gateway.local/.well-known/jwks.json
+      - FASTAPI__HOST=0.0.0.0
+      - FASTAPI__PORT=8000
+      - FASTAPI__LOG_LEVEL=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   redis:
     image: redis:7-alpine
     ports:
