@@ -116,4 +116,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(user_search_router)
 
+    # W4 — User Intent Classification (M5.10)
+    from app.api.v1.intent import router as intent_router
+
+    app.include_router(intent_router)
+
     return app
