@@ -126,4 +126,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(assistant_router)
 
+    # W7 — Event Notification Summarization (M5.13)
+    from app.api.v1.notifications import router as notifications_router
+
+    app.include_router(notifications_router)
+
     return app

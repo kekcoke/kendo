@@ -66,6 +66,7 @@ builder.Services.AddHostedService<DlqDepthMonitor>();
 
 // Register AI handlers infrastructure
 builder.Services.AddKendoFastApiSummarizationClient(builder.Configuration);
+builder.Services.AddKendoNotificationSummarization(builder.Configuration);
 builder.Services.AddSingleton<NotificationDispatcherChannel>();
 builder.Services.AddHostedService<NotificationDispatcherHostedService>();
 
