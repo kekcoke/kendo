@@ -6,11 +6,13 @@ using Kendo.Worker.Handlers;
 using Kendo.Worker.Models;
 using Kendo.Worker.Workers;
 using Kendo.Shared.Messaging.Events;
+using Kendo.Shared.Resilience;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Moq.Protected;
+using Kendo.Shared.Resilience;
 
 namespace Kendo.Tests.Worker;
 
@@ -47,7 +49,7 @@ public class NotificationSummarizationTests
         var db = new WorkerDbContext(options);
         db.Database.EnsureCreated();
 
-        var resilientDb = new WorkerResilientDbContext(db);
+        var resilientDb = new WorkerResilientDbContext(db, new PassThroughResiliencePipeline());
 
         var summarizationClient = (clientMock ?? new Mock<INotificationSummarizationClient>()).Object;
         var channel = new NotificationDispatcherChannel();
@@ -106,14 +108,16 @@ public class NotificationSummarizationTests
         var mock = CreateMockClientWithSseResponse(
             ["Hello ", "Bob, ", "your event is confirmed!"]);
         var (handler, _, channel) = CreateHandler(mock);
-        var message = new NotificationRequestedEvent(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            "event.confirmation",
-            "friendly",
-            DateTimeOffset.UtcNow,
-            Guid.NewGuid(),
-            "event");
+        var message = new NotificationRequestedEvent
+        {
+            MessageId = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            TemplateId = "event.confirmation",
+            Tone = "friendly",
+            RequestedAt = DateTimeOffset.UtcNow,
+            RelatedEntityId = Guid.NewGuid(),
+            RelatedEntityType = "event"
+        };
 
         // Act
         await handler.Handle(message);
@@ -139,14 +143,16 @@ public class NotificationSummarizationTests
                 "Service Unavailable", "Circuit breaker OPEN", 503));
 
         var (handler, _, _) = CreateHandler(mock);
-        var message = new NotificationRequestedEvent(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            "event.confirmation",
-            "friendly",
-            DateTimeOffset.UtcNow,
-            Guid.NewGuid(),
-            "event");
+        var message = new NotificationRequestedEvent
+        {
+            MessageId = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            TemplateId = "event.confirmation",
+            Tone = "friendly",
+            RequestedAt = DateTimeOffset.UtcNow,
+            RelatedEntityId = Guid.NewGuid(),
+            RelatedEntityType = "event"
+        };
 
         // Act & Assert — exception is re-thrown so Rebus DLQs
         var ex = await Assert.ThrowsAsync<NotificationSummarizationClientException>(
@@ -173,14 +179,16 @@ public class NotificationSummarizationTests
             .Returns(asyncEnumerable);
 
         var (handler, _, channel) = CreateHandler(mock);
-        var message = new NotificationRequestedEvent(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            "event.test",
-            "friendly",
-            DateTimeOffset.UtcNow,
-            Guid.NewGuid(),
-            "event");
+        var message = new NotificationRequestedEvent
+        {
+            MessageId = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            TemplateId = "event.test",
+            Tone = "friendly",
+            RequestedAt = DateTimeOffset.UtcNow,
+            RelatedEntityId = Guid.NewGuid(),
+            RelatedEntityType = "event"
+        };
 
         // Act
         await handler.Handle(message);
@@ -194,8 +202,9 @@ public class NotificationSummarizationTests
 
     private static async IAsyncEnumerable<NotificationSummarizationChunk> GetErrorThrowingEnumerable()
     {
+        yield return new NotificationSummarizationChunk { Event = "chunk", Text = "more ", TokenCount = 2 };
         await Task.Yield();
-        throw new InvalidOperationException("SSE stream connection lost");
+        throw new HttpRequestException("SSE stream connection lost");
     }
 
     [Fact]
@@ -204,14 +213,16 @@ public class NotificationSummarizationTests
         // Arrange — first call succeeds
         var mock = CreateMockClientWithSseResponse(["Hello!"]);
         var (handler, db, channel) = CreateHandler(mock);
-        var message = new NotificationRequestedEvent(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            "event.test",
-            "friendly",
-            DateTimeOffset.UtcNow,
-            Guid.NewGuid(),
-            "event");
+        var message = new NotificationRequestedEvent
+        {
+            MessageId = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            TemplateId = "event.test",
+            Tone = "friendly",
+            RequestedAt = DateTimeOffset.UtcNow,
+            RelatedEntityId = Guid.NewGuid(),
+            RelatedEntityType = "event"
+        };
 
         await handler.Handle(message);
         var firstDelivered = await channel.Reader.ReadAsync(CancellationToken.None);
@@ -220,8 +231,30 @@ public class NotificationSummarizationTests
         // Act — same message delivered again
         await handler.Handle(message);
 
-        // Assert — no second notification enqueued
-        var hasSecond = await channel.Reader.WaitToReadAsync(TimeSpan.FromMilliseconds(100));
-        Assert.False(hasSecond);
+        // Assert — no second notification enqueued (timeout means idempotency worked)
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+        try
+        {
+            await channel.Reader.WaitToReadAsync(cts.Token);
+            Assert.Fail("Expected timeout but a second notification was enqueued");
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected — idempotency blocked duplicate notification
+        }
     }
+}
+
+/// <summary>
+/// Pass-through implementation of IResiliencePipeline that executes the
+/// function directly without any retry/circuit-breaker logic.
+/// Used in tests to avoid Moq type-matcher limitations with generics.
+/// </summary>
+public class PassThroughResiliencePipeline : IResiliencePipeline
+{
+    public Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken ct = default)
+        => action(ct);
+
+    public Task ExecuteAsync(Func<CancellationToken, Task> action, CancellationToken ct = default)
+        => action(ct);
 }
