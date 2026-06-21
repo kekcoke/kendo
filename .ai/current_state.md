@@ -8,10 +8,10 @@
 ## Session Variables
 
 ```yaml
-current_day: 32
-current_phase: 0        # Phase 0 ready for next session
+current_day: 35
+current_phase: 1        # Phase 1 — Architecture & Contract Design
 branch_base: develop
-feature_branch: feature/day-31-w5-embeddings-backfill
+feature_branch: feature/day-35-w7-notification-summarization
 phase_plan: "05"        # AI/Vector Service (FastAPI)
 ```
 
@@ -20,9 +20,9 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* **Day 31 (M5.11) implemented** — W5 Embeddings Backfill & Re-indexing: `python -m app.jobs.reindex` CLI with checkpoint/resume, `POST /internal/embeddings/batch` on UserService, apscheduler daily 02:00 UTC cron, 26 new tests all green. PR #38 merged to `develop`.
-* **P0 workloads delivered in prior sessions:** W1 (M5.7), W2 (M5.8), W8 (M5.14) all live in `develop`. Roadmap component status updated to reflect actual state.
-* **Next: Day 32 — M5.9 (W3) User Profile Semantic Search.** First workload that reads from the embeddings populated by W5.
+* **Days 32-34 (M5.9, M5.10, M5.12) delivered** — W3 User Profile Semantic Search, W4 User Intent Classification, W6 Document Q&A. All merged to `develop`. Reconciliation artifacts (review reports + runbooks) created retroactively via PR #42.
+* **Phase 0 hardened** — dependency-aware milestone ordering, prior-day sealing gate, doc gap scan, Phase 4b artifact gates added via PR #43.
+* **Next: Day 35 — M5.13 (W7) Event Notification Summarization.** Last remaining Phase 05 workload. Worker calls FastAPI directly for personalized notification summaries.
 
 ---
 
@@ -301,6 +301,111 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 
 ---
 
+## Phase Outputs — Day 28
+> Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
+
+| Phase | Artifact | Status |
+|---|---|---|
+| 0 | State initialized, variables resolved → M5.7 W1 Event Ingestion RAG | ✅ |
+| 0b | *Skipped* (repo has prior commits) | ✅ |
+| 1 | `docs/architecture/day_28_spec.md` (adopted from `fastapi_rag_service_spec.md §W1`) | ✅ |
+| 2 | Commit log — zero halted units — feature branch on `origin` | ✅ |
+| 4 | `ops/runbooks/day_28_runbook.md` | ✅ |
+| 4b | `docs/architecture/day_28_review_report.md` + PR #36 squash-merged to `develop` | ✅ |
+| 5 | State update, roadmap update, changelog, validation | ✅ |
+
+---
+
+## Phase Outputs — Day 29
+> Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
+
+| Phase | Artifact | Status |
+|---|---|---|
+| 0 | State initialized, variables resolved → M5.14 W8 Evaluation & Regression Gate | ✅ |
+| 0b | *Skipped* (repo has prior commits) | ✅ |
+| 1 | `docs/architecture/day_28_spec.md` (adopted) + `docs/architecture/day_30_spec.md` | ✅ |
+| 2 | Commit log — zero halted units — feature branch on `origin` | ✅ |
+| 4 | `.github/workflows/ci.yml` (eval-gate job) · `ops/runbooks/day_29_runbook.md` | ✅ |
+| 4b | `docs/architecture/day_29_review_report.md` + PR #35 squash-merged to `develop` | ✅ |
+| 5 | State update, roadmap update, changelog, validation | ✅ |
+
+---
+
+## Phase Outputs — Day 30
+> Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
+
+| Phase | Artifact | Status |
+|---|---|---|
+| 0 | State initialized, variables resolved → M5.8 W2 Event Conflict & Schedule Reasoning | ✅ |
+| 0b | *Skipped* (repo has prior commits) | ✅ |
+| 1 | `docs/architecture/day_30_spec.md` (restored from git history) | ✅ |
+| 2 | Commit log — zero halted units — feature branch on `origin` | ✅ |
+| 4 | `ops/runbooks/day_28_runbook.md` (inherited — no new infra) | ✅ |
+| 4b | `docs/architecture/day_30_review_report.md` + PR #37 squash-merged to `develop` | ✅ |
+| 5 | State update, roadmap update, changelog, validation | ✅ |
+
+---
+
+## Phase Outputs — Day 31
+> Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
+
+| Phase | Artifact | Status |
+|---|---|---|
+| 0 | State initialized, variables resolved → M5.11 W5 Embeddings Backfill & Re-indexing | ✅ |
+| 0b | *Skipped* (repo has prior commits) | ✅ |
+| 1 | `docs/architecture/day_31_spec.md` (adopts `fastapi_rag_service_spec.md §W5` by reference) | ✅ |
+| 2 | Commit log — zero halted units — feature branch on `origin` | ✅ |
+| 4 | `ops/runbooks/day_31_runbook.md` | ✅ |
+| 4b | `docs/architecture/day_31_review_report.md` + PR #38 squash-merged to `develop` | ✅ |
+| 5 | State update, roadmap update, changelog, validation | ✅ |
+
+---
+
+## Phase Outputs — Day 32
+> Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
+
+| Phase | Artifact | Status |
+|---|---|---|
+| 0 | State initialized, variables resolved → M5.9 W3 User Profile Semantic Search | ✅ |
+| 0b | *Skipped* (repo has prior commits) | ✅ |
+| 1 | `docs/architecture/day_31_spec.md` (adopts `fastapi_rag_service_spec.md §W3` by reference) | ✅ |
+| 2 | Commit log — 3/3 committed, zero halted — feature branch on `origin` | ✅ |
+| 4 | `ops/runbooks/day_32_runbook.md` | ✅ |
+| 4b | `docs/architecture/day_32_review_report.md` + PR #39 squash-merged to `develop` | ✅ |
+| 5 | State update, roadmap update, changelog, validation | ✅ |
+
+---
+
+## Phase Outputs — Day 33
+> Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
+
+| Phase | Artifact | Status |
+|---|---|---|
+| 0 | State initialized, variables resolved → M5.10 W4 User Intent Classification | ✅ |
+| 0b | *Skipped* (repo has prior commits) | ✅ |
+| 1 | `docs/architecture/day_32_spec.md` (adopts `fastapi_rag_service_spec.md §W4` by reference) | ✅ |
+| 2 | Commit log — 2/2 committed, zero halted — feature branch on `origin` | ✅ |
+| 4 | `ops/runbooks/day_33_runbook.md` | ✅ |
+| 4b | `docs/architecture/day_33_review_report.md` + PR #40 squash-merged to `develop` | ✅ |
+| 5 | State update, roadmap update, changelog, validation | ✅ |
+
+---
+
+## Phase Outputs — Day 34
+> Legend: ✅ complete · ❌ failed/blocked · ~ pending · ⏳ deferred
+
+| Phase | Artifact | Status |
+|---|---|---|
+| 0 | State initialized, variables resolved → M5.12 W6 Document Q&A / Onboarding Assistant | ✅ |
+| 0b | *Skipped* (repo has prior commits) | ✅ |
+| 1 | `docs/architecture/day_33_spec.md` (adopts `fastapi_rag_service_spec.md §W6` by reference) | ✅ |
+| 2 | Commit log — 2/2 committed, zero halted — feature branch on `origin` | ✅ |
+| 4 | `ops/runbooks/day_34_runbook.md` | ✅ |
+| 4b | `docs/architecture/day_34_review_report.md` + PR #41 squash-merged to `develop` | ✅ |
+| 5 | State update, roadmap update, changelog, validation | ✅ |
+
+---
+
 ## Incomplete Tasks
 > Tasks started this day but halted (lint/test failure, spec ambiguity, reviewer FAIL routing).  
 > **Must be empty before Day N+1 can begin.** Populated by Reviewer FAIL verdict or commit-gate halt.
@@ -362,6 +467,9 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 | 29 | W8 Evaluation & Regression Gate (M5.14) | pytest + DeepEval + Ragas framework, CI eval-gate job, w1_eval_dataset.json, baseline script; 2 eval test files | Merged PR #35 to develop | ✅ |
 | 30 | W2 Event Conflict & Schedule Reasoning (M5.8) | `POST /v1/rag/validate`, ValidateChain with multi-step reasoning, Gateway proxy, 6 Python tests, runbook; W1 rebased + merged w/ eval dataset | Merged PR #37, spec restored from git history | ✅ |
 | 31 | W5 Embeddings Backfill & Re-indexing (M5.11) | `python -m app.jobs.reindex` CLI, `POST /internal/embeddings/batch` on UserService, UserServiceClient with retry+CB, apscheduler daily cron, checkpoint/resume, 26 new tests, runbook | PR #38 squash-merged to develop | ✅ |
+| 32 | W3 User Profile Semantic Search (M5.9) | `GET /v1/users/search` — hybrid pgvector cosine + BM25, EnsembleRetriever with 0.7/0.3 weight split, Gateway proxy via UserSearchController | PR #39 squash-merged to develop at `35ce976` | ✅ |
+| 33 | W4 User Intent Classification (M5.10) | `POST /v1/intent/classify` — LLM-as-classifier, 80ms p95, accuracy ≥ 95%, Gateway IntentAdvisoryMiddleware with hard-coded fallback | PR #40 squash-merged to develop at `c77cc55` | ✅ |
+| 34 | W6 Document Q&A / Onboarding Assistant (M5.12) | `POST /v1/assistant/ask` — citation-grounded RAG, Chroma local vector store, atomic index rebuild, 388 test lines | PR #41 squash-merged to develop at `23ff73d` | ✅ |
 
 ---
 
@@ -400,20 +508,21 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 * **Services:** Gateway (port 5000 behind NGINX), UserService (port 5001 expose), Worker (port 5002 expose), FastAPI (port 8000 internal), PostgreSQL (port 5432), Redis (port 6379), NGINX (port 80 internal, 5000 host) — all containerized
 * **Docker Compose:** All 7 services with health checks; multi-replica (3 each) scaling for chaos testing
 * **Chaos Test Suite:** 3 xUnit tests (`Category=Chaos`) with Docker CLI integration. 3 bash scripts in `scripts/chaos/`. CI job `chaos-test` runs after `docker-compose`, invokes `run_all.sh` on multi-replica stack, uploads structured results artifact
-* **Tests:** 121/121 unit tests passing (no .NET changes; FastAPI Python RAG pipeline verified with integration tests)
-* **Runbooks:** Day 16 scenario playbooks + Day 17-24 day runbooks covering JWT auth, AI event contracts, Worker AI handlers, UserService Event Domain, FastAPI scaffold + RAG pipeline + Gateway routing + resilience parity
-* **Branches:** `develop` (PR #28 squash-merged — Day 22: LangChain RAG Pipeline M5.2+M5.3) — on `origin`
-* **Pipelines:** CI pipeline active: build-and-test -> docker-compose -> chaos-test (known flakiness: test_db_downtime intermittent 000000)
+* **Tests:** 121/121 unit tests passing (no .NET changes; FastAPI Python RAG pipeline verified with integration tests; W1-W6 workload tests added across Days 28-34)
+* **Runbooks:** Day 16 scenario playbooks + Day 17-34 day runbooks covering all Phase 05 workloads including reconciliation artifacts
+* **Branches:** `develop` at `785898d` (PR #43 merged — orchestration hardening) — on `origin`
+* **Pipelines:** CI pipeline active: build-and-test -> docker-compose -> chaos-test (known flakiness: test_db_downtime intermittent 000000); eval-gate runs on FastAPI PRs
 
 * **Docker Compose:** All 7 services with health checks; PostgreSQL (5s interval), app services (10s interval), Redis (5s interval), NGINX (10s interval, wget self-health), FastAPI (10s interval, curl health/live); `depends_on` postgres healthy → userservice; fastapi depends_on postgres
-* **Database:** PostgreSQL 16 + pgvector (`pgvector/pgvector:pg16`), `kendo_users` DB, `vector` extension enabled via EF Core migration
-* **Messaging:** Rebus registered with Azure Service Bus transport — Gateway + UserService in producer mode (one-way client), Worker in consumer mode (polls `kendo-events`, 3 workers). Graceful skip when `Rebus__ConnectionString` is missing (local dev).
+* **Database:** PostgreSQL 16 + pgvector (`pgvector/pgvector:pg16`), `kendo_users` DB, `vector` extension enabled via EF Core migration; `user_embeddings` table populated by W5 backfill
+* **Messaging:** Rebus registered with Azure Service Bus transport — Gateway + UserService in producer mode (one-way client), Worker in consumer mode (polls `kendo-events`, 3 workers). Graceful skip when `Rebus__ConnectionString` is missing (local dev). AI queue topology wired for W7 notification events.
 * **Idempotency:** `IdempotencyRecords` table (WorkerDbContext) tracks message processing status (Processing/Completed/Failed). MessageId PK enforces uniqueness. Crash recovery re-processes messages left in Processing state. All handlers wrap DB ops in transactions.
-* **Branches:** `main` (scaffolding), `develop` (PR #30 squash-merged — Day 24: FastAPI Resilience Parity M5.5) — both on `origin`
-* **Pipelines:** CI pipeline active — build → unit tests → data integration tests (with pgvector + Redis service containers) → resilience tests → messaging tests → docker compose health verification → replica header verification → traffic distribution check. AI queue topology tests (graceful skip when ASB absent) run as part of messaging tests.
-* **Tests:** 126/126 unit tests passing (no .NET changes; 18 new Python resilience tests added in Day 24)
+* **Branches:** `main` (scaffolding), `develop` at `785898d` — both on `origin`
+* **Pipelines:** CI pipeline active — build → unit tests → data integration tests (with pgvector + Redis service containers) → resilience tests → messaging tests → docker compose health verification → replica header verification → traffic distribution check. Eval-gate job (DeepEval + Ragas) runs on FastAPI PRs. AI queue topology tests (graceful skip when ASB absent) run as part of messaging tests.
+* **Tests:** Phase 05 workloads: W1 (M5.7 ✅), W2 (M5.8 ✅), W3 (M5.9 ✅), W4 (M5.10 ✅), W5 (M5.11 ✅), W6 (M5.12 ✅), W8 (M5.14 ✅). Remaining: W7 (M5.13).
 * **Observability:** All 3 .NET services emit OpenTelemetry traces to console exporter; FastAPI service also emits OpenTelemetry traces (OTLP or console exporter); trace IDs correlated in all log lines; RFC 7807 `trace_id` field populated from active OTel span in both .NET and FastAPI services; `traceparent` W3C propagation from Gateway through FastAPI
 * **Local:** API instances: 4 (Gateway, UserService, Worker, FastAPI), Postgres: 1 (Docker), RabbitMQ: 1 (infrastructure, not yet consumed), Redis: 1 (Docker, wired, best-effort cache)
+* **Orchestration:** Phase 0 hardened with dependency-aware milestone ordering, prior-day sealing gate, doc gap scan, Phase 4b artifact gates (PR #43)
 
 ---
 

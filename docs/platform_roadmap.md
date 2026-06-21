@@ -333,10 +333,10 @@ that drives implementation is `docs/architecture/fastapi_rag_service_spec.md`.
 | `docker compose` (FastAPI service) | Internal-network port `8000`, health check wired to Docker, ≥ 2 replicas when Phase 03 HA standards apply | ✅ (Day 21) |
 | **W1 — Event Ingestion RAG** (M5.7) | `POST /api/events/ingest` — free-form text → structured `Event` JSON via LangChain + pgvector retrieval | ✅ (Day 28, merged PR #36) |
 | **W2 — Event Conflict & Schedule Reasoning** (M5.8) | `POST /api/events/{id}/validate` — multi-step reasoning tool-use, audit trace returned | ✅ (Day 30, merged PR #37) |
-| **W3 — User Profile Semantic Search** (M5.9) | `GET /api/users/search?q=...` — hybrid pgvector cosine + Postgres BM25 | ~ (planned) |
-| **W4 — User Intent Classification** (M5.10) | Advisory router at Gateway, ≤ 80ms p95, hard-coded fallback in .NET | ~ (planned) |
+| **W3 — User Profile Semantic Search** (M5.9) | `GET /api/users/search?q=...` — hybrid pgvector cosine + Postgres BM25 | ✅ (Day 32, merged PR #39) |
+| **W4 — User Intent Classification** (M5.10) | Advisory router at Gateway, ≤ 80ms p95, hard-coded fallback in .NET | ✅ (Day 33, merged PR #40) |
 | **W5 — Embeddings Backfill & Re-indexing** (M5.11) | `apscheduler` cron + `python -m app.jobs.reindex` CLI; writes via `UserService` admin endpoint (defense-in-depth) | ✅ (Day 31, merged PR #38) |
-| **W6 — Document Q&A / Onboarding Assistant** (M5.12) | Internal tool; cited answers (file + line range); file-watcher debounced reindex | ~ (planned) |
+| **W6 — Document Q&A / Onboarding Assistant** (M5.12) | Internal tool; cited answers (file + line range); file-watcher debounced reindex | ✅ (Day 34, merged PR #41) |
 | **W7 — Event Notification Summarization** (M5.13) | Worker calls FastAPI directly via new `IFastAPIClient` in `Kendo.Shared`; SSE streaming | ~ (planned) |
 | **W8 — Evaluation & Regression Gate** (M5.14) | pytest + DeepEval + Ragas; CI artifact; fails build on > 5% regression vs. `main` | ✅ (Day 29, merged PR #35) |
 | *(All Phase 01 + 02 + 03 components)* | Inherited and still passing all prior acceptance criteria; the .NET Semantic Kernel RAG path remains primary for synchronous RAG | ✅ (inherited) |
