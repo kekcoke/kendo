@@ -1,4 +1,4 @@
-# Architecture Spec — Day 34 — W7: Event Notification Summarization
+# Architecture Spec — Day 35 — W7: Event Notification Summarization
 
 > **Milestone:** M5.13 — W7 Event Notification Summarization (P2)  
 > **Roadmap phase:** 05 — AI/Vector Service (FastAPI)  

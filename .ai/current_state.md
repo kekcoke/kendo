@@ -9,7 +9,7 @@
 
 ```yaml
 current_day: 35
-current_phase: 1        # Phase 1 — Architecture & Contract Design
+current_phase: 0        # Phase 0 ready for next session
 branch_base: develop
 feature_branch: feature/day-35-w7-notification-summarization
 phase_plan: "05"        # AI/Vector Service (FastAPI)
@@ -20,9 +20,9 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 ## Last Session Summary
 > Replaced each session. 3-bullet hand-off note for the next run.
 
-* **Days 32-34 (M5.9, M5.10, M5.12) delivered** — W3 User Profile Semantic Search, W4 User Intent Classification, W6 Document Q&A. All merged to `develop`. Reconciliation artifacts (review reports + runbooks) created retroactively via PR #42.
-* **Phase 0 hardened** — dependency-aware milestone ordering, prior-day sealing gate, doc gap scan, Phase 4b artifact gates added via PR #43.
-* **Next: Day 35 — M5.13 (W7) Event Notification Summarization.** Last remaining Phase 05 workload. Worker calls FastAPI directly for personalized notification summaries.
+* **Day 35 (M5.13) implemented** — W7 Event Notification Summarization: FastAPI SSE endpoint with tone control (professional/friendly/urgent), `INotificationSummarizationClient` in Kendo.Shared with independent Polly pipeline, Worker `NotificationRequestedHandler` integration with DLQ-on-failure / template-fallback. PR #44 merged to `develop`.
+* **Phase 05 complete** — All 14 milestone markers (M5.1–M5.14) now live on `develop`. All workloads (W1–W8) shipped.
+* **Next: Phase 05 acceptance criteria verification.** Confirm all Phase 05 gates pass before advancing to Phase 06.
 
 ---
 
@@ -470,6 +470,7 @@ phase_plan: "05"        # AI/Vector Service (FastAPI)
 | 32 | W3 User Profile Semantic Search (M5.9) | `GET /v1/users/search` — hybrid pgvector cosine + BM25, EnsembleRetriever with 0.7/0.3 weight split, Gateway proxy via UserSearchController | PR #39 squash-merged to develop at `35ce976` | ✅ |
 | 33 | W4 User Intent Classification (M5.10) | `POST /v1/intent/classify` — LLM-as-classifier, 80ms p95, accuracy ≥ 95%, Gateway IntentAdvisoryMiddleware with hard-coded fallback | PR #40 squash-merged to develop at `c77cc55` | ✅ |
 | 34 | W6 Document Q&A / Onboarding Assistant (M5.12) | `POST /v1/assistant/ask` — citation-grounded RAG, Chroma local vector store, atomic index rebuild, 388 test lines | PR #41 squash-merged to develop at `23ff73d` | ✅ |
+| 35 | W7 Event Notification Summarization (M5.13) | `POST /v1/notifications/summarize` — SSE streaming, tone control, `INotificationSummarizationClient` in Kendo.Shared, Worker integration with DLQ/template-fallback | PR #44 squash-merged to develop at `c068546` | ✅ |
 
 ---
 

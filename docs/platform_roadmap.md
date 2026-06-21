@@ -337,6 +337,6 @@ that drives implementation is `docs/architecture/fastapi_rag_service_spec.md`.
 | **W4 — User Intent Classification** (M5.10) | Advisory router at Gateway, ≤ 80ms p95, hard-coded fallback in .NET | ✅ (Day 33, merged PR #40) |
 | **W5 — Embeddings Backfill & Re-indexing** (M5.11) | `apscheduler` cron + `python -m app.jobs.reindex` CLI; writes via `UserService` admin endpoint (defense-in-depth) | ✅ (Day 31, merged PR #38) |
 | **W6 — Document Q&A / Onboarding Assistant** (M5.12) | Internal tool; cited answers (file + line range); file-watcher debounced reindex | ✅ (Day 34, merged PR #41) |
-| **W7 — Event Notification Summarization** (M5.13) | Worker calls FastAPI directly via new `IFastAPIClient` in `Kendo.Shared`; SSE streaming | ~ (planned) |
+| **W7 — Event Notification Summarization** (M5.13) | Worker calls FastAPI directly via `INotificationSummarizationClient` in `Kendo.Shared`; SSE streaming, proper event:/data: parsing, independent Polly pipeline | ✅ (Day 35, merged PR #44) |
 | **W8 — Evaluation & Regression Gate** (M5.14) | pytest + DeepEval + Ragas; CI artifact; fails build on > 5% regression vs. `main` | ✅ (Day 29, merged PR #35) |
 | *(All Phase 01 + 02 + 03 components)* | Inherited and still passing all prior acceptance criteria; the .NET Semantic Kernel RAG path remains primary for synchronous RAG | ✅ (inherited) |
