@@ -116,7 +116,7 @@ public class NotificationRequestedHandler : IHandleMessages<NotificationRequeste
                 await foreach (var chunk in _summarizationClient.SummarizeStreamAsync(
                     new NotificationSummarizationRequest
                     {
-                        EventId = message.RelatedEntityType == "event" ? message.RelatedEntityId : Guid.Empty,
+                        EventId = message.RelatedEntityType == "event" ? (message.RelatedEntityId ?? Guid.Empty) : Guid.Empty,
                         UserId = message.UserId,
                         TemplateId = message.TemplateId,
                         Tone = message.Tone

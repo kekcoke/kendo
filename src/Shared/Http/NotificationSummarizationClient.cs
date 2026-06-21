@@ -167,29 +167,29 @@ public class NotificationSummarizationClient : INotificationSummarizationClient
         {
             case "chunk":
                 if (root.TryGetProperty("text", out var text))
-                    chunk = chunk with { Text = text.GetString() };
+                    chunk.Text = text.GetString();
                 if (root.TryGetProperty("token_count", out var tokenCount))
-                    chunk = chunk with { TokenCount = tokenCount.GetInt32() };
+                    chunk.TokenCount = tokenCount.GetInt32();
                 break;
 
             case "done":
                 if (root.TryGetProperty("notification_body", out var body))
-                    chunk = chunk with { NotificationBody = body.GetString() };
+                    chunk.NotificationBody = body.GetString();
                 if (root.TryGetProperty("prompt_version", out var promptVer))
-                    chunk = chunk with { PromptVersion = promptVer.GetString() };
+                    chunk.PromptVersion = promptVer.GetString();
                 if (root.TryGetProperty("total_tokens", out var totalTokens))
-                    chunk = chunk with { TotalTokens = totalTokens.GetInt32() };
+                    chunk.TotalTokens = totalTokens.GetInt32();
                 if (root.TryGetProperty("trace_id", out var traceId))
-                    chunk = chunk with { TraceId = traceId.GetString() };
+                    chunk.TraceId = traceId.GetString();
                 break;
 
             case "error":
                 if (root.TryGetProperty("title", out var title))
-                    chunk = chunk with { Title = title.GetString() };
+                    chunk.Title = title.GetString();
                 if (root.TryGetProperty("status", out var status))
-                    chunk = chunk with { Status = status.GetInt32() };
+                    chunk.Status = status.GetInt32();
                 if (root.TryGetProperty("detail", out var detail))
-                    chunk = chunk with { Detail = detail.GetString() };
+                    chunk.Detail = detail.GetString();
                 break;
         }
 
