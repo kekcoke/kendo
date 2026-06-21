@@ -1,12 +1,63 @@
 #!/usr/bin/env bash
 # validate_state.sh — Phase 5 guard
-# Usage: ./scripts/validate_state.sh <DAY_NUMBER>
-# Exits 0 if all expected artifacts for the given day exist and current_state.md is consistent.
+# Usage: ./scripts/validate_state.sh <DAY_NUMBER> [--audit]
+#   <DAY_NUMBER>  Validate artifacts for a specific day
+#   --audit       Scan ALL completed days in current_state.md and report gaps
+# Exits 0 if all expected artifacts exist and current_state.md is consistent.
 # Exits 1 with a descriptive error on any failure.
 
 set -euo pipefail
 
-DAY="${1:?Usage: validate_state.sh <DAY_NUMBER>}"
+MODE="${1:-}"
+if [[ "$MODE" == "--audit" ]]; then
+  STATE=".ai/current_state.md"
+  ERRORS=()
+  WARNINGS=()
+
+  check_file() {
+    local path="$1"; local label="$2"
+    if [[ ! -f "$path" ]]; then ERRORS+=("MISSING $label: $path"); fi
+  }
+
+  echo "━━━ validate_state.sh --audit ━━━"
+  # Extract all day numbers from Completed Days table (| NN | or | 0NN |)
+  DAYS=$(grep -oE '^\| [0-9]{2} ' "$STATE" | tr -d '| ' | sort -u)
+  if [[ -z "$DAYS" ]]; then
+    echo "⚠️  No completed days found in $STATE"
+    exit 0
+  fi
+  for DAY in $DAYS; do
+    DAY_PAD=$(printf '%02d' "$DAY")
+    echo ""
+    echo "  Day ${DAY_PAD}:"
+    SPEC="docs/architecture/day_${DAY_PAD}_spec.md"
+    REPORT="docs/architecture/day_${DAY_PAD}_review_report.md"
+    RUNBOOK="ops/runbooks/day_${DAY_PAD}_runbook.md"
+    MISSING=""
+    [[ -f "$SPEC" ]]    || { MISSING+=" spec"; }
+    [[ -f "$REPORT" ]]  || { MISSING+=" review_report"; }
+    [[ -f "$RUNBOOK" ]] || { MISSING+=" runbook"; }
+    if [[ -n "$MISSING" ]]; then
+      echo "    ⚠️  Missing:${MISSING}"
+      WARNINGS+=("Day ${DAY_PAD}: missing${MISSING}")
+    else
+      echo "    ✅ All artifacts present"
+    fi
+  done
+  echo ""
+  if [[ ${#WARNINGS[@]} -eq 0 ]]; then
+    echo "✅ Audit complete — no documentation gaps found."
+    exit 0
+  else
+    echo "⚠️  ${#WARNINGS[@]} day(s) with documentation gaps (non-blocking):"
+    for w in "${WARNINGS[@]}"; do echo "   • $w"; done
+    echo ""
+    echo "Reconcile gaps by creating missing artifacts on a fix branch."
+    exit 0  # Audit mode: gaps are warnings, not failures
+  fi
+fi
+
+DAY="${1:?Usage: validate_state.sh <DAY_NUMBER> [--audit]}"
 DAY_PAD=$(printf '%02d' "$DAY")
 STATE=".ai/current_state.md"
 ERRORS=()
