@@ -306,4 +306,135 @@ public class FastAPIWorkloadTests
         Assert.Empty(result.UserIds);
         Assert.Empty(result.Relevance);
     }
+
+    // ========================================================================
+    // W4 — ClassifyIntentAsync
+    // ========================================================================
+
+    [Fact]
+    [Trait("Category", "FastAPIW4")]
+    public async Task ClassifyIntentAsync_ValidRequest_ReturnsRouteAndConfidence()
+    {
+        // Arrange
+        var expected = new IntentClassificationResult(
+            Route: "events.ingest",
+            Confidence: 0.87);
+
+        var handler = CreateMockHandler(HttpStatusCode.OK, expected);
+        var http = new HttpClient(handler.Object);
+        var client = new FastAPIClient(
+            http, CreateOptions(timeoutSeconds: 2), new FastApiExceptionMapper(),
+            Mock.Of<ILogger<FastAPIClient>>());
+
+        // Act
+        var result = await client.ClassifyIntentAsync(
+            new IntentClassificationRequest(
+                Body: "Create a new event for next Friday",
+                SubjectId: "user-abc"),
+            CancellationToken.None);
+
+        // Assert
+        Assert.Equal(expected.Route, result.Route);
+        Assert.Equal(expected.Confidence, result.Confidence);
+    }
+
+    [Fact]
+    [Trait("Category", "FastAPIW4")]
+    public async Task ClassifyIntentAsync_FastApi503_AfterRetriesThrows()
+    {
+        // Arrange — simulate FastAPI outage
+        var problemResponse = new
+        {
+            type = "about:blank",
+            title = "Service Unavailable",
+            status = 503,
+            detail = "intent classifier unavailable",
+            trace_id = "trace-503"
+        };
+
+        var json = JsonSerializer.Serialize(problemResponse, JsonOptions);
+        var mock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+        mock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .Returns(() => Task.FromResult(new HttpResponseMessage
+            {
+                StatusCode = HttpStatusCode.ServiceUnavailable,
+                Content = new StringContent(json)
+            }));
+
+        var httpClient = new HttpClient(mock.Object) { BaseAddress = new Uri("http://fastapi:8000") };
+        var client = new FastAPIClient(
+            httpClient, CreateOptions(timeoutSeconds: 2), new FastApiExceptionMapper(),
+            Mock.Of<ILogger<FastAPIClient>>());
+
+        // Act & Assert — after retries + CB opens, FastApiClientException is thrown
+        var ex = await Assert.ThrowsAsync<FastApiClientException>(() =>
+            client.ClassifyIntentAsync(
+                new IntentClassificationRequest(
+                    Body: "Create an event",
+                    SubjectId: "user-test"),
+                CancellationToken.None));
+
+        Assert.Contains("Service Unavailable", ex.Message);
+    }
+
+    [Fact]
+    [Trait("Category", "FastAPIW4")]
+    public async Task ClassifyIntentAsync_NetworkError_ReturnsFastApiClientException()
+    {
+        // Arrange — simulate a network failure that triggers retry + circuit breaker
+        var mock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+        mock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException("Connection refused"));
+
+        var httpClient = new HttpClient(mock.Object) { BaseAddress = new Uri("http://fastapi:8000") };
+        var client = new FastAPIClient(
+            httpClient, CreateOptions(timeoutSeconds: 2), new FastApiExceptionMapper(),
+            Mock.Of<ILogger<FastAPIClient>>());
+
+        // Act & Assert — after retries + CB opens, FastApiClientException is thrown
+        var ex = await Assert.ThrowsAsync<FastApiClientException>(() =>
+            client.ClassifyIntentAsync(
+                new IntentClassificationRequest(
+                    Body: "Test event",
+                    SubjectId: "user-test"),
+                CancellationToken.None));
+
+        // The Gateway middleware catches FastApiClientException and falls back
+        Assert.Contains("Service Unavailable", ex.Message);
+    }
+
+    [Fact]
+    [Trait("Category", "FastAPIW4")]
+    public async Task ClassifyIntentAsync_EmptyBody_SendsAsExpected()
+    {
+        // Arrange — empty body should still reach FastAPI (Gateway validates)
+        var expected = new IntentClassificationResult(
+            Route: "fallback",
+            Confidence: 0.15);
+
+        var handler = CreateMockHandler(HttpStatusCode.OK, expected);
+        var http = new HttpClient(handler.Object);
+        var client = new FastAPIClient(
+            http, CreateOptions(timeoutSeconds: 2), new FastApiExceptionMapper(),
+            Mock.Of<ILogger<FastAPIClient>>());
+
+        // Act
+        var result = await client.ClassifyIntentAsync(
+            new IntentClassificationRequest(
+                Body: "",
+                SubjectId: "user-abc"),
+            CancellationToken.None);
+
+        // Assert
+        Assert.Equal("fallback", result.Route);
+        Assert.Equal(0.15, result.Confidence);
+    }
 }
