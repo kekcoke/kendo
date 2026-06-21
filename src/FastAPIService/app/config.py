@@ -64,6 +64,9 @@ class Settings(BaseSettings):
     rate_limit_window_seconds: int = 60
     rate_limit_bucket_capacity: int = 100
 
+    # --- Intent Classifier (W4) ---
+    intent_classifier_model: str = "gpt-4o-mini"
+
     # --- UserService integration (W5 backfill) ---
     user_service_base_url: str = "http://userservice:5001"
     user_service_timeout: int = 30
