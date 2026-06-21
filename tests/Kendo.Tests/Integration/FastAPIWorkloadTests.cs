@@ -308,6 +308,139 @@ public class FastAPIWorkloadTests
     }
 
     // ========================================================================
+    // W6 — AskAssistantAsync
+    // ========================================================================
+
+    [Fact]
+    [Trait("Category", "FastAPIW6")]
+    public async Task AskAssistantAsync_ValidQuery_ReturnsAnswerWithCitations()
+    {
+        // Arrange
+        var expected = new AssistantAnswerResult(
+            Answer: "The RAG pipeline uses pgvector for similarity search.",
+            Citations: [
+                new Citation(
+                    File: "docs/architecture/day_22_spec.md",
+                    LineStart: 142,
+                    LineEnd: 148,
+                    Excerpt: "pgvector cosine similarity search via asyncpg")
+            ]);
+
+        var handler = CreateMockHandler(HttpStatusCode.OK, expected);
+        var http = new HttpClient(handler.Object);
+        var client = new FastAPIClient(
+            http, CreateOptions(), new FastApiExceptionMapper(),
+            Mock.Of<ILogger<FastAPIClient>>());
+
+        // Act
+        var result = await client.AskAssistantAsync(
+            new AssistantQuestionRequest(
+                Question: "How does the RAG pipeline work?",
+                ContextFile: null),
+            CancellationToken.None);
+
+        // Assert
+        Assert.Equal(expected.Answer, result.Answer);
+        Assert.Single(result.Citations);
+        Assert.Equal("docs/architecture/day_22_spec.md", result.Citations[0].File);
+        Assert.Equal(142, result.Citations[0].LineStart);
+        Assert.Equal(148, result.Citations[0].LineEnd);
+        Assert.NotNull(result.Citations[0].Excerpt);
+    }
+
+    [Fact]
+    [Trait("Category", "FastAPIW6")]
+    public async Task AskAssistantAsync_FastApi503_AfterRetriesThrows()
+    {
+        // Arrange
+        var problemResponse = new
+        {
+            type = "about:blank",
+            title = "Service Unavailable",
+            status = 503,
+            detail = "assistant index unavailable",
+            trace_id = "trace-503"
+        };
+
+        var json = JsonSerializer.Serialize(problemResponse, JsonOptions);
+        var mock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+        mock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .Returns(() => Task.FromResult(new HttpResponseMessage
+            {
+                StatusCode = HttpStatusCode.ServiceUnavailable,
+                Content = new StringContent(json)
+            }));
+
+        var httpClient = new HttpClient(mock.Object) { BaseAddress = new Uri("http://fastapi:8000") };
+        var client = new FastAPIClient(
+            httpClient, CreateOptions(), new FastApiExceptionMapper(),
+            Mock.Of<ILogger<FastAPIClient>>());
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<FastApiClientException>(() =>
+            client.AskAssistantAsync(
+                new AssistantQuestionRequest(
+                    Question: "How does RAG work?",
+                    ContextFile: null),
+                CancellationToken.None));
+
+        Assert.Contains("Service Unavailable", ex.Message);
+    }
+
+    [Fact]
+    [Trait("Category", "FastAPIW6")]
+    public async Task AskAssistantAsync_EmptyQuestion_Throws()
+    {
+        // Arrange
+        var handler = CreateMockHandler(HttpStatusCode.BadRequest);
+        var http = new HttpClient(handler.Object);
+        var client = new FastAPIClient(
+            http, CreateOptions(), new FastApiExceptionMapper(),
+            Mock.Of<ILogger<FastAPIClient>>());
+
+        // Act & Assert — Gateway validates before calling FastAPI, but test the client path
+        await Assert.ThrowsAsync<HttpRequestException>(() =>
+            client.AskAssistantAsync(
+                new AssistantQuestionRequest(
+                    Question: "",
+                    ContextFile: null),
+                CancellationToken.None));
+    }
+
+    [Fact]
+    [Trait("Category", "FastAPIW6")]
+    public async Task AskAssistantAsync_NetworkError_ReturnsFastApiClientException()
+    {
+        // Arrange
+        var mock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+        mock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException("Connection refused"));
+
+        var httpClient = new HttpClient(mock.Object) { BaseAddress = new Uri("http://fastapi:8000") };
+        var client = new FastAPIClient(
+            httpClient, CreateOptions(timeoutSeconds: 2), new FastApiExceptionMapper(),
+            Mock.Of<ILogger<FastAPIClient>>());
+
+        // Act & Assert — after retries + CB opens, FastApiClientException is thrown
+        var ex = await Assert.ThrowsAsync<FastApiClientException>(() =>
+            client.AskAssistantAsync(
+                new AssistantQuestionRequest(
+                    Question: "How does RAG work?",
+                    ContextFile: null),
+                CancellationToken.None));
+
+        Assert.Contains("Service Unavailable", ex.Message);
+    }
+
+    // ========================================================================
     // W4 — ClassifyIntentAsync
     // ========================================================================
 
