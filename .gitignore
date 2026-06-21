@@ -17,3 +17,9 @@ bin/
 kendo_fastapi.egg-info/
 obj/
 scripts/chaos/results/
+
+# Angular / Node.js
+node_modules/
+dist/
+*.js.map
+*.log

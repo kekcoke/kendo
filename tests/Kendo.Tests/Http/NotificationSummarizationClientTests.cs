@@ -265,7 +265,7 @@ public class NotificationSummarizationClientTests
     [Fact]
     public async Task SummarizeStreamAsync_ServerErrorTriggersRetry()
     {
-        // Arrange — return 503 three times (exhausts retries before CB opens)
+        // Arrange — return 503 each time (factory to avoid ObjectDisposedException on retry)
         var handlerMock = new Mock<HttpMessageHandler>();
         handlerMock
             .Protected()
@@ -273,10 +273,11 @@ public class NotificationSummarizationClientTests
                 "SendAsync",
                 ItExpr.IsAny<HttpRequestMessage>(),
                 ItExpr.IsAny<CancellationToken>())
-            .ReturnsAsync(new HttpResponseMessage
+            .Returns(() => Task.FromResult(new HttpResponseMessage
             {
                 StatusCode = HttpStatusCode.ServiceUnavailable,
-            });
+                Content = new ByteArrayContent([])
+            }));
 
         var httpClient = new HttpClient(handlerMock.Object);
         httpClient.BaseAddress = new Uri("http://fastapi:8000");
@@ -292,13 +293,15 @@ public class NotificationSummarizationClientTests
             Tone = "friendly"
         };
 
-        // Act & Assert
-        var ex = await Assert.ThrowsAsync<HttpRequestException>(async () =>
+        // Act & Assert — after 3 retries, CB opens and throws NotificationSummarizationClientException
+        var ex = await Assert.ThrowsAsync<NotificationSummarizationClientException>(async () =>
         {
             await foreach (var _ in client.SummarizeStreamAsync(request, CancellationToken.None))
             {
             }
         });
+        Assert.Equal(503, ex.StatusCode);
+        Assert.Equal("Service Unavailable", ex.ErrorTitle);
     }
 
     [Fact]
