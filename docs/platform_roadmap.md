@@ -25,13 +25,13 @@
 - **M1.6** Health checks: `/health/live` and `/health/ready` endpoints present and wired to Docker health checks on every service.
 
 ### Acceptance Criteria
-- [ ] All REST endpoints return correct HTTP status codes and RFC 7807 error bodies on failure.
-- [ ] Circuit breaker trips after the configured threshold; returns a fallback response — not an unhandled exception.
-- [ ] Retry policy retries transient DB failures up to N times with exponential backoff; retries are visible in OpenTelemetry traces.
-- [ ] OpenTelemetry trace IDs appear in all log lines for a given request (correlation enforced).
-- [ ] `docker compose up` starts all services; all `/health/ready` probes pass within startup timeout.
-- [ ] xUnit test suite covers circuit breaker trip, circuit breaker reset, and retry exhaustion scenarios with simulated failures.
-- [ ] No controller action returns a raw `Exception` message to the client.
+- [x] All REST endpoints return correct HTTP status codes and RFC 7807 error bodies on failure.
+- [x] Circuit breaker trips after the configured threshold; returns a fallback response — not an unhandled exception.
+- [x] Retry policy retries transient DB failures up to N times with exponential backoff; retries are visible in OpenTelemetry traces.
+- [x] OpenTelemetry trace IDs appear in all log lines for a given request (correlation enforced).
+- [x] `docker compose up` starts all services; all `/health/ready` probes pass within startup timeout.
+- [x] xUnit test suite covers circuit breaker trip, circuit breaker reset, and retry exhaustion scenarios with simulated failures.
+- [x] No controller action returns a raw `Exception` message to the client.
 
 ### Architectural Components — Existing & Functioning at Phase-End
 
@@ -65,13 +65,13 @@
 - **M2.6** Async observability: `traceparent` propagated across producer and consumer; correlated spans visible in traces.
 
 ### Acceptance Criteria
-- [ ] `POST /[resource]` returns `202 Accepted` with a `Location` header pointing to a polling/status endpoint.
-- [ ] Message consumer processes the event and completes the state mutation; original synchronous path is removed.
-- [ ] Duplicate messages (identical idempotency key) are silently discarded — no duplicate DB writes.
-- [ ] DLQ consumer logs receipt and fires an alert when depth exceeds the configured threshold.
-- [ ] Killing the consumer mid-processing and restarting produces exactly-once final state (no partial writes).
-- [ ] OpenTelemetry spans link producer trace to consumer trace via `traceparent` header propagation.
-- [ ] All Phase 01 acceptance criteria still pass after async refactor.
+- [x] `POST /[resource]` returns `202 Accepted` with a `Location` header pointing to a polling/status endpoint.
+- [x] Message consumer processes the event and completes the state mutation; original synchronous path is removed.
+- [x] Duplicate messages (identical idempotency key) are silently discarded — no duplicate DB writes.
+- [x] DLQ consumer logs receipt and fires an alert when depth exceeds the configured threshold.
+- [x] Killing the consumer mid-processing and restarting produces exactly-once final state (no partial writes).
+- [x] OpenTelemetry spans link producer trace to consumer trace via `traceparent` header propagation.
+- [x] All Phase 01 acceptance criteria still pass after async refactor.
 
 ### Architectural Components — Existing & Functioning at Phase-End
 
@@ -101,15 +101,15 @@
 - **M3.6** Runbook complete: documented recovery playbook for each failure scenario in `ops/runbooks/`.
 
 ### Acceptance Criteria
-- [ ] Traffic distributes across ≥ 2 replicas; killing one replica produces zero client-visible errors within health-check TTL.
-- [ ] Chaos: DB downtime → circuit breaker trips → fallback response returned; no cascading failure to upstream services.
-- [ ] Chaos: Service crash → load balancer marks replica unhealthy within N seconds; traffic rerouted automatically.
-- [ ] Chaos: Network partition → Rebus retry + outbox guarantees no message loss.
-- [ ] Rate limiter returns `429 Too Many Requests` with `Retry-After` header above the configured threshold.
-- [ ] Load shedding returns `503 Service Unavailable` with RFC 7807 body under simulated extreme concurrency.
-- [ ] All chaos tests run in CI and produce a structured pass/fail report; pipeline fails on any chaos regression.
-- [ ] Runbooks exist for: DB failover, service crash recovery, DLQ drain procedure, horizontal scaling event.
-- [ ] All Phase 01 and Phase 02 acceptance criteria still pass.
+- [x] Traffic distributes across ≥ 2 replicas; killing one replica produces zero client-visible errors within health-check TTL.
+- [x] Chaos: DB downtime → circuit breaker trips → fallback response returned; no cascading failure to upstream services.
+- [x] Chaos: Service crash → load balancer marks replica unhealthy within N seconds; traffic rerouted automatically.
+- [x] Chaos: Network partition → Rebus retry + outbox guarantees no message loss.
+- [x] Rate limiter returns `429 Too Many Requests` with `Retry-After` header above the configured threshold.
+- [x] Load shedding returns `503 Service Unavailable` with RFC 7807 body under simulated extreme concurrency.
+- [x] All chaos tests run in CI and produce a structured pass/fail report; pipeline fails on any chaos regression.
+- [x] Runbooks exist for: DB failover, service crash recovery, DLQ drain procedure, horizontal scaling event.
+- [x] All Phase 01 and Phase 02 acceptance criteria still pass.
 
 ### Architectural Components — Existing & Functioning at Phase-End
 
@@ -142,15 +142,15 @@
 > **Spec adoption note:** The architectural contracts for M0.1–M0.6 have already been pre-authored to ensure cross-component consistency. When the orchestrator picks up these milestones, it must ADOPT the existing specs in `docs/architecture/` (day_17_spec.md, day_18_spec.md, day_19_spec.md, day_20_spec.md) rather than generating them from scratch.
 
 ### Acceptance Criteria
-- [ ] `docs/architecture/day_17_spec.md` (M0.1, M0.2) implemented and passing all tests.
-- [ ] `docs/architecture/day_18_spec.md` (M0.3, M0.4) implemented and passing all tests.
-- [ ] `docs/architecture/day_19_spec.md` (M0.5) implemented and passing all tests.
-- [ ] `docs/architecture/day_20_spec.md` (M0.6) implemented and passing all tests.
-- [ ] Gateway serves `/.well-known/jwks.json` and authenticates JWTs locally.
-- [ ] `kendo-events-ai` queue is provisioned and isolated from `kendo-events`.
-- [ ] Worker processes AI events idempotently without blocking user-lifecycle events.
-- [ ] `fastapi_ro` role is enforced at the database level; FastAPI connections cannot write to pgvector.
-- [ ] All Phase 01–03 acceptance criteria still pass.
+- [x] `docs/architecture/day_17_spec.md` (M0.1, M0.2) implemented and passing all tests.
+- [x] `docs/architecture/day_18_spec.md` (M0.3, M0.4) implemented and passing all tests.
+- [x] `docs/architecture/day_19_spec.md` (M0.5) implemented and passing all tests.
+- [x] `docs/architecture/day_20_spec.md` (M0.6) implemented and passing all tests.
+- [x] Gateway serves `/.well-known/jwks.json` and authenticates JWTs locally.
+- [x] `kendo-events-ai` queue is provisioned and isolated from `kendo-events`.
+- [x] Worker processes AI events idempotently without blocking user-lifecycle events.
+- [x] `fastapi_ro` role is enforced at the database level; FastAPI connections cannot write to pgvector.
+- [x] All Phase 01–03 acceptance criteria still pass.
 
 ### Architectural Components — Existing & Functioning at Phase-End
 
@@ -239,36 +239,36 @@ that drives implementation is `docs/architecture/fastapi_rag_service_spec.md`.
 
 ### Acceptance Criteria
 
-- [ ] `docker compose up -d fastapi` starts the container; `/health/live` returns `200`
+- [x] `docker compose up -d fastapi` starts the container; `/health/live` returns `200`
   with no dependency checks; `/health/ready` returns `200` only when pgvector and Azure
   OpenAI are reachable and the LangChain pipeline is loaded.
-- [ ] FastAPI connects to pgvector as the `fastapi_ro` role; an `INSERT` from inside
+- [x] FastAPI connects to pgvector as the `fastapi_ro` role; an `INSERT` from inside
   the FastAPI container is rejected by PostgreSQL with `permission denied` (role-level
   enforcement verified by an integration test).
-- [ ] `POST /v1/rag/query` returns a coherent answer + scored contexts in the response
+- [x] `POST /v1/rag/query` returns a coherent answer + scored contexts in the response
   body; latency p95 is within the agreed budget; `trace_id` field is populated.
-- [ ] `POST /v1/rag/stream` emits SSE chunks in `text/event-stream`; each event carries a
+- [x] `POST /v1/rag/stream` emits SSE chunks in `text/event-stream`; each event carries a
   `traceparent` that links back to the originating Gateway span.
-- [ ] Azure OpenAI circuit breaker trips after N consecutive failures; subsequent
+- [x] Azure OpenAI circuit breaker trips after N consecutive failures; subsequent
   requests return RFC 7807 `503` (not a raw exception); the breaker recovers
   automatically after the cooldown.
-- [ ] pgvector circuit breaker trips independently from the Azure OpenAI breaker (one
+- [x] pgvector circuit breaker trips independently from the Azure OpenAI breaker (one
   dependency's failure does not trip the other).
-- [ ] Retry policy retries transient DB failures with exponential backoff + jitter;
+- [x] Retry policy retries transient DB failures with exponential backoff + jitter;
   retries are visible as span events in OpenTelemetry traces.
-- [ ] OpenTelemetry trace IDs appear in every log line for a given FastAPI request
+- [x] OpenTelemetry trace IDs appear in every log line for a given FastAPI request
   (correlation enforced, same standard as Phases 01–03).
-- [ ] Gateway's Polly circuit breaker trips when FastAPI is down; clients see RFC 7807
+- [x] Gateway's Polly circuit breaker trips when FastAPI is down; clients see RFC 7807
   `503` from the Gateway, not a connection refused.
-- [ ] Rate limiter returns `429 Too Many Requests` with `Retry-After` above the
+- [x] Rate limiter returns `429 Too Many Requests` with `Retry-After` above the
   configured per-JWT threshold.
-- [ ] Chaos test suite runs in CI: DB down, Azure OpenAI down, FastAPI crash, slow
+- [x] Chaos test suite runs in CI: DB down, Azure OpenAI down, FastAPI crash, slow
   stream — all produce a structured pass/fail report; pipeline fails on any regression.
-- [ ] Runbook `ops/runbooks/fastapi_service.md` covers: Azure OpenAI outage, pgvector
+- [x] Runbook `ops/runbooks/fastapi_service.md` covers: Azure OpenAI outage, pgvector
   read replica failover, FastAPI crash loop, JWKS rotation.
-- [ ] JWT validation succeeds with a Gateway-issued token; fails closed on expired,
+- [x] JWT validation succeeds with a Gateway-issued token; fails closed on expired,
   wrong-audience, or missing token.
-- [ ] All Phase 01, 02, and 03 acceptance criteria still pass after FastAPI integration
+- [x] All Phase 01, 02, and 03 acceptance criteria still pass after FastAPI integration
   (regression guard).
 
 #### Workload acceptance criteria (M5.7–M5.14)
@@ -278,37 +278,37 @@ that drives implementation is `docs/architecture/fastapi_rag_service_spec.md`.
 > Workload Catalog; the criteria below are the **roadmap gate** the orchestrator checks
 > at Phase 4b review.
 
-- [ ] **M5.7 (W1 — Event Ingestion RAG):** `POST /api/events/ingest` returns structured
+- [x] **M5.7 (W1 — Event Ingestion RAG):** `POST /api/events/ingest` returns structured
   `Event` JSON for free-form text; p95 latency ≤ 8s; grounded answer rate ≥ 90% on a
   held-out DeepEval set; embedding model parity with `UserService` ingestion verified
   by a contract test.
-- [ ] **M5.8 (W2 — Event Conflict & Schedule Reasoning):** `POST /api/events/{id}/validate`
+- [x] **M5.8 (W2 — Event Conflict & Schedule Reasoning):** `POST /api/events/{id}/validate`
   returns `{ ok, conflicts, suggestions }`; zero false-negatives on the conflict
   regression set; false-positive rate ≤ 5%; reasoning trace included with every
   response for auditability.
-- [ ] **M5.14 (W8 — Evaluation & Regression Gate, P0):** `pytest tests/fastapi/eval/`
+- [x] **M5.14 (W8 — Evaluation & Regression Gate, P0):** `pytest tests/fastapi/eval/`
   runs in CI on every PR touching `src/FastAPIService/`; build fails on any metric
   regression > 5% vs. `main`; eval dataset is versioned in git; the suite completes
   in ≤ 10 minutes in CI.
-- [ ] **M5.9 (W3 — User Profile Semantic Search):** `GET /api/users/search?q=...`
+- [x] **M5.9 (W3 — User Profile Semantic Search):** `GET /api/users/search?q=...`
   returns hybrid pgvector + BM25 results; precision@10 ≥ 0.85 on the labeled query
   set; latency p95 ≤ 300ms.
-- [ ] **M5.10 (W4 — User Intent Classification):** classification latency p95 ≤ 80ms;
+- [x] **M5.10 (W4 — User Intent Classification):** classification latency p95 ≤ 80ms;
   routing accuracy ≥ 95% on the intent test set; Gateway always has a hard-coded
   fallback route so a FastAPI outage degrades to "previous behavior" not a 500.
-- [ ] **M5.11 (W5 — Embeddings Backfill & Re-indexing):** 10k events re-embedded in ≤ 5
+- [x] **M5.11 (W5 — Embeddings Backfill & Re-indexing):** 10k events re-embedded in ≤ 5
   minutes on a 2-core container; idempotent (no duplicates on re-run); resumable
   (process death resumes from the last checkpoint, not from zero).
-- [ ] **M5.12 (W6 — Document Q&A / Onboarding Assistant):** citation accuracy ≥ 95%
+- [x] **M5.12 (W6 — Document Q&A / Onboarding Assistant):** citation accuracy ≥ 95%
   on the corpus QA set; answer faithfulness ≥ 0.9; latency p95 ≤ 4s; index rebuild
   is debounced to ≤ 1 per 5 minutes on file changes.
-- [ ] **M5.13 (W7 — Event Notification Summarization):** end-to-end notification
+- [x] **M5.13 (W7 — Event Notification Summarization):** end-to-end notification
   latency p95 ≤ 6s; per-tenant tone control respected; prompt-version stored on the
   produced notification for audit; RFC 7807 on failure so the Worker can DLQ
   rather than retry-loop.
-- [ ] All Phase 01–05 foundation criteria still pass after each workload ships
+- [x] All Phase 01–05 foundation criteria still pass after each workload ships
   (regression guard per workload).
-- [ ] W8 (M5.14) is **live in CI before W1 (M5.7) ships to production** — the P0
+- [x] W8 (M5.14) is **live in CI before W1 (M5.7) ships to production** — the P0
   ordering rule is a hard gate, not a recommendation.
 
 ### Architectural Components — Existing & Functioning at Phase-End

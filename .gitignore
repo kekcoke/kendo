@@ -1,20 +1,19 @@
-# Environment & secrets
-.env
-*.env
+
 !.env.example
-
+# .NET build artifacts
 # Chaos test results (generated artifacts)
-scripts/chaos/results/
-
+# Environment & secrets
 # Python build artifacts
 **/__pycache__/
+*.env
 *.pyc
 *.pyo
-
-# .NET build artifacts
-bin/
-obj/
-*.user
-*.suo
 *.sln.docstates
+*.suo
+*.user
+.env
 .vs/
+bin/
+kendo_fastapi.egg-info/
+obj/
+scripts/chaos/results/
