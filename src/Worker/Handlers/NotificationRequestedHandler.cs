@@ -23,20 +23,20 @@ public class NotificationRequestedHandler : IHandleMessages<NotificationRequeste
 {
     private readonly WorkerDbContext _db;
     private readonly WorkerResilientDbContext _resilientDb;
-    private readonly IFastAPISummarizationClient _fastApiSummarization;
+    private readonly INotificationSummarizationClient _summarizationClient;
     private readonly NotificationDispatcherChannel _dispatcherChannel;
     private readonly ILogger<NotificationRequestedHandler> _logger;
 
     public NotificationRequestedHandler(
         WorkerDbContext db,
         WorkerResilientDbContext resilientDb,
-        IFastAPISummarizationClient fastApiSummarization,
+        INotificationSummarizationClient summarizationClient,
         NotificationDispatcherChannel dispatcherChannel,
         ILogger<NotificationRequestedHandler> logger)
     {
         _db = db;
         _resilientDb = resilientDb;
-        _fastApiSummarization = fastApiSummarization;
+        _summarizationClient = summarizationClient;
         _dispatcherChannel = dispatcherChannel;
         _logger = logger;
     }
@@ -108,17 +108,62 @@ public class NotificationRequestedHandler : IHandleMessages<NotificationRequeste
 
             // Call FastAPI W7 via SSE summarization and collect the rendered body
             var renderedBody = new StringBuilder();
-            await foreach (var chunk in _fastApiSummarization.SummarizeStreamAsync(
-                new SummarizationRequest
-                {
-                    EventId = message.RelatedEntityType == "event" ? message.RelatedEntityId : null,
-                    UserId = message.UserId,
-                    TemplateId = message.TemplateId,
-                    Tone = message.Tone
-                },
-                CancellationToken.None))
+            string? promptVersion = null;
+            string? traceId = null;
+
+            try
             {
-                renderedBody.Append(chunk.Text);
+                await foreach (var chunk in _summarizationClient.SummarizeStreamAsync(
+                    new NotificationSummarizationRequest
+                    {
+                        EventId = message.RelatedEntityType == "event" ? message.RelatedEntityId : Guid.Empty,
+                        UserId = message.UserId,
+                        TemplateId = message.TemplateId,
+                        Tone = message.Tone
+                    },
+                    CancellationToken.None))
+                {
+                    switch (chunk.Event)
+                    {
+                        case "chunk":
+                            if (chunk.Text != null)
+                                renderedBody.Append(chunk.Text);
+                            break;
+
+                        case "done":
+                            promptVersion = chunk.PromptVersion ?? "w7-notification-v1";
+                            traceId = chunk.TraceId;
+                            _logger.LogInformation(
+                                "Notification summarization complete: traceId={TraceId}, promptVersion={PromptVersion}, totalTokens={TotalTokens}",
+                                traceId, promptVersion, chunk.TotalTokens);
+                            break;
+
+                        case "error":
+                            _logger.LogError(
+                                "FastAPI summarization error: title={Title}, status={Status}, detail={Detail}",
+                                chunk.Title, chunk.Status, chunk.Detail);
+                            throw new InvalidOperationException(
+                                $"FastAPI summarization failed: {chunk.Title} — {chunk.Detail}");
+                    }
+                }
+            }
+            catch (NotificationSummarizationClientException ex)
+            {
+                _logger.LogError(ex,
+                    "NotificationSummarizationClient rejected summarization for UserId={UserId}: {Title} (HTTP {Status})",
+                    message.UserId, ex.ErrorTitle, ex.StatusCode);
+                throw; // Rebus will retry and eventually DLQ
+            }
+            catch (Exception ex) when (ex is not InvalidOperationException)
+            {
+                // On SSE stream error mid-generation: discard partial body,
+                // fall back to template-based notification, log warning, do NOT DLQ
+                _logger.LogWarning(ex,
+                    "SSE stream error mid-generation for UserId={UserId}. Falling back to template-based notification.",
+                    message.UserId);
+                renderedBody.Clear();
+                renderedBody.Append($"[Template: {message.TemplateId}] Event notification for {message.UserId}.");
+                promptVersion = "template-fallback";
             }
 
             // Enqueue the rendered notification for delivery
@@ -127,7 +172,7 @@ public class NotificationRequestedHandler : IHandleMessages<NotificationRequeste
                 UserId = message.UserId,
                 TemplateId = message.TemplateId,
                 RenderedBody = renderedBody.ToString(),
-                PromptVersion = "v1",
+                PromptVersion = promptVersion ?? "unknown",
                 RequestedAt = message.RequestedAt
             });
 
