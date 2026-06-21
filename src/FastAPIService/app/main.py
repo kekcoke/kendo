@@ -121,4 +121,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(intent_router)
 
+    # W6 — Document Q&A / Onboarding Assistant (M5.12)
+    from app.api.v1.assistant import router as assistant_router
+
+    app.include_router(assistant_router)
+
     return app
