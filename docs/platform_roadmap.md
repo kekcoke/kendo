@@ -315,19 +315,19 @@ that drives implementation is `docs/architecture/fastapi_rag_service_spec.md`.
 
 > Legend: ✅ complete · ❌ failed/blocked · ~ not yet started
 
-| Component | Description | Status |
-|---|---|---|
-| `FastAPIService` (Python) | `src/FastAPIService/` — FastAPI + Uvicorn, JWT auth, RFC 7807, OpenTelemetry, health endpoints | ✅ (Day 21) |
-| `LangChain RAG Pipeline` | `RetrievalQA` chain, versioned prompt templates, sync + SSE streaming | ✅ (Day 22) |
-| `pgvector Read-Only Role` | `fastapi_ro` PostgreSQL role provisioned by `UserService` migration; SELECT-only grants via asyncpg | ✅ (Day 22) |
-| `pybreaker` | Circuit breaker per external dependency (pgvector, Azure OpenAI) with state metrics | ✅ (Day 24) |
-| `tenacity` Retry | Exponential backoff + jitter, transient-fault predicate, span-event visibility | ✅ (Day 24) |
-| `RFC 7807 Problem Details` | FastAPI exception handler returning `application/problem+json` with `trace_id` | ✅ (Day 21) |
-| `OpenTelemetry (FastAPI)` | `opentelemetry-instrumentation-fastapi`, `-asyncpg`, `-httpx`; OTLP exporter | ✅ (Day 24) |
-| `Trace Correlation (FastAPI)` | `traceparent` extracted from Gateway request; embedded in every SSE event | ✅ (Day 24) |
-| `Gateway → FastAPI Client` | Typed `IFastAPIClient` with Polly timeout + circuit breaker; `/api/rag/{sync,stream}` route | ✅ (Day 23) |
-| `FastAPI Rate Limiter` | Token-bucket per JWT subject; `429 + Retry-After` | ✅ (Day 25) |
-| `FastAPI Chaos Suite` | pytest chaos tests; DB down, Azure OpenAI down, crash, slow stream; `--chaos` marker gated | ✅ (Day 25) |
+| Component | Description | Status | Depends on |
+|---|---|---|---|---|
+| `FastAPIService` (Python) | `src/FastAPIService/` — FastAPI + Uvicorn, JWT auth, RFC 7807, OpenTelemetry, health endpoints | ✅ (Day 21) | *none* |
+| `LangChain RAG Pipeline` | `RetrievalQA` chain, versioned prompt templates, sync + SSE streaming | ✅ (Day 22) | FastAPIService |
+| `pgvector Read-Only Role` | `fastapi_ro` PostgreSQL role provisioned by `UserService` migration; SELECT-only grants via asyncpg | ✅ (Day 22) | *none* |
+| `pybreaker` | Circuit breaker per external dependency (pgvector, Azure OpenAI) with state metrics | ✅ (Day 24) | FastAPIService |
+| `tenacity` Retry | Exponential backoff + jitter, transient-fault predicate, span-event visibility | ✅ (Day 24) | FastAPIService |
+| `RFC 7807 Problem Details` | FastAPI exception handler returning `application/problem+json` with `trace_id` | ✅ (Day 21) | *none* |
+| `OpenTelemetry (FastAPI)` | `opentelemetry-instrumentation-fastapi`, `-asyncpg`, `-httpx`; OTLP exporter | ✅ (Day 24) | FastAPIService |
+| `Trace Correlation (FastAPI)` | `traceparent` extracted from Gateway request; embedded in every SSE event | ✅ (Day 24) | FastAPIService, OpenTelemetry (FastAPI) |
+| `Gateway → FastAPI Client` | Typed `IFastAPIClient` with Polly timeout + circuit breaker; `/api/rag/{sync,stream}` route | ✅ (Day 23) | FastAPIService |
+| `FastAPI Rate Limiter` | Token-bucket per JWT subject; `429 + Retry-After` | ✅ (Day 25) | FastAPIService |
+| `FastAPI Chaos Suite` | pytest chaos tests; DB down, Azure OpenAI down, crash, slow stream; `--chaos` marker gated | ✅ (Day 25) | FastAPIService |
 | `FastAPI Runbook` | `ops/runbooks/fastapi_service.md` — consolidated playbook (Azure OpenAI outage, pgvector failover, crash loop, JWKS rotation) | ✅ (Day 25) |
 | `FastAPI Dockerfile` | Multi-stage `python:3.12-slim`, non-root user, health check | ✅ (Day 21) |
 | `docker compose` (FastAPI service) | Internal-network port `8000`, health check wired to Docker, ≥ 2 replicas when Phase 03 HA standards apply | ✅ (Day 21) |

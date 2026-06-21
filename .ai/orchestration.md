@@ -54,10 +54,23 @@ If either check fails: surface the issue and document it in `current_state.md §
 **Trigger:** Start of every new session  
 **Inputs:** `.ai/current_state.md`, `docs/platform_roadmap.md §{{phase_plan}}`
 
+**Prior-day sealing check (new — runs first):**
+- If `current_day > 1` → verify Phase 5 ran for the prior session:
+  - `./scripts/validate_state.sh $((current_day - 1))` exits 0
+  - `## Completed Days` has a row for the prior day
+  - `current_phase: 0` AND `incomplete_tasks: []`
+- If any check fails → **surface `prior session not sealed` blocker.** Do not advance `current_day`. Recommend running Phase 5 for the prior day(s) as a remediation session before beginning new work.
+
+**Documentation gap scan (new — runs after prior-day check):**
+For each `## Completed Days` row where artifacts might be missing, verify:
+- `docs/architecture/day_{NN}_review_report.md` exists
+- `ops/runbooks/day_{NN}_runbook.md` exists
+If gaps found: surface as **carry-forward items** with severity `mild` (docs gap). Recommend reconciliation PR but do NOT block day advancement — documentation gaps are not code regressions.
+
 **Actions (in order):**
 1. Read `current_state.md` in full. Load: `## Completed Days`, `## Active Dependency Map`, `## Carry-Forward Items`.
 2. Check `incomplete_tasks` — if non-empty → **halt**. Surface each blocker. Do not advance to Phase 1.
-3. Read `docs/platform_roadmap.md §Phase {{phase_plan}}` `### Components` table. Find the first `~` row. Read its `Milestone` column — this resolves both `{{MILESTONE}}` (e.g. `M1.1`) and `{{MILESTONE_TITLE}}` (e.g. `Multi-service scaffold`). Group all `~` rows sharing that milestone value — they are treated as a single atomic deliverable this session.
+3. Read `docs/platform_roadmap.md §Phase {{phase_plan}}` `### Components` table. Scan all `~` rows and build a candidate set. For each candidate, check its `Depends on` dependencies against the `## Active Dependency Map` and all `✅` completed rows in the component table. **Pick the first candidate whose dependencies are all satisfied.** If no `~` candidate has satisfied dependencies → surface a blocker: "All remaining components in this phase have unmet dependencies." Group all `~` rows sharing the selected milestone value — they are treated as a single atomic deliverable this session. Log the selection rationale to `## Architectural Decisions Log` if the selected milestone is not the first `~` row in the table.
 4. If all components in the phase are ✅ → surface "Phase {{phase_plan}} complete" and prompt user to advance `phase_plan` before proceeding.
 5. Confirm the resolved milestone does not conflict with any dependency in `## Active Dependency Map`.
 6. Resolve `{{DAY_NUMBER}}`, `{{BRANCH_BASE}}`, and `{{phase_plan}}` for this session.
@@ -65,6 +78,7 @@ If either check fails: surface the issue and document it in `current_state.md §
 
 **Gate to Phase 0b / Phase 1 — all must be true:**
 - [ ] `incomplete_tasks` is empty
+- [ ] Prior-day sealing check passed (if `current_day > 1`)
 - [ ] `{{MILESTONE}}` resolved from roadmap component table
 - [ ] No dependency conflicts detected
 - [ ] `{{DAY_NUMBER}}`, `{{BRANCH_BASE}}`, `{{phase_plan}}` resolved
@@ -170,6 +184,8 @@ git checkout -b "$BRANCH"
 - [ ] CI pipeline passes on the feature branch
 - [ ] Health check endpoint validated by pipeline
 - [ ] Rollback plan documented in runbook
+- [ ] `docs/architecture/day_{{DAY_NUMBER}}_review_report.md` exists
+- [ ] `ops/runbooks/day_{{DAY_NUMBER}}_runbook.md` exists
 
 ---
 
