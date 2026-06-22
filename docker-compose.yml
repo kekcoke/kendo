@@ -62,6 +62,7 @@ services:
       - Redis__ConnectionString=redis:6379
       - Rebus__AiWorkers=2
       - Rebus__AiParallelism=5
+      - Rebus__AiDlqDepthThreshold=5
     depends_on:
       postgres:
         condition: service_healthy
@@ -124,6 +125,20 @@ services:
       - FASTAPI__HOST=0.0.0.0
       - FASTAPI__PORT=8000
       - FASTAPI__LOG_LEVEL=info
+      # pgvector read-only connection (fastapi_ro role)
+      - FASTAPI__VECTOR__READ_DSN=postgresql://fastapi_ro:fastapi_ro_pw@postgres:5432/kendo_users
+      # LLM / Azure OpenAI
+      - FASTAPI__LLM__ENDPOINT=https://your-openai.openai.azure.com
+      - FASTAPI__LLM__API_KEY=
+      - FASTAPI__LLM__DEPLOYMENT_NAME=gpt-4o
+      - FASTAPI__LLM__API_VERSION=2024-02-15-preview
+      # Embedding model
+      - FASTAPI__EMBEDDING_MODEL=BGE-large-en-v1.5
+      - FASTAPI__EMBEDDING_DIMENSION=1024
+      # Rate Limiting
+      - FASTAPI__RATE_LIMIT__TOKENS_PER_WINDOW=100
+      - FASTAPI__RATE_LIMIT__WINDOW_SECONDS=60
+      - FASTAPI__RATE_LIMIT__BUCKET_CAPACITY=100
     depends_on:
       postgres:
         condition: service_healthy
